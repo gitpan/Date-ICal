@@ -1,10 +1,11 @@
+# $Header: /cvsroot/reefknot/Date-ICal/lib/Date/ICal/Duration.pm,v 1.10 2001/12/27 02:07:50 rbowen Exp $
 package Date::ICal::Duration;
 
 use strict;
 use Carp;
 
 use vars qw($VERSION );
-$VERSION = (qw'$Revision: 1.6 $')[1];
+$VERSION = (qw'$Revision: 1.10 $')[1];
 
 # Documentation {{{
 
@@ -14,13 +15,13 @@ Date::ICal::Duration - durations in iCalendar format, for math purposes.
 
 =head1 VERSION
 
-$Revision: 1.6 $
+$Revision: 1.10 $
 
 =head1 SYNOPSIS
 
     use Date::ICal::Duration;
 
-    $d = Date::ICal::Duration->new( string => '-P1W3DT2H3M45S' );
+    $d = Date::ICal::Duration->new( ical => '-P1W3DT2H3M45S' );
 
     $d = Date::ICal::Duration->new( weeks => 1, 
                                     days => 1,
@@ -102,11 +103,16 @@ sub new {
     my $seconds_only = 1;    # keep track of whether we were given length in seconds only
     $seconds_only = 0 unless (defined $args{'seconds'}); 
 
+    # If one of the attributes is negative, then they all must be
+    # negative. Otherwise, we're not sure what this means.
     foreach (qw(hours minutes seconds days weeks)) {
         if (defined($args{$_}) )   {
-            # make sure this argument is all digits
-            if ($args{$_} !~ /\D+/) {
-                # if so, assign it
+            # make sure this argument is all digits, optional - sign
+            if ($args{$_} =~ m/-?[0-9]+$/) { 
+                if ($args{$_} < 0) {
+                    $args{sign} = '-';
+                    $args{$_} = abs($args{$_});
+                }
                 $verified->{$_} = $args{$_};
                 unless ($_ eq 'seconds') {
                     $seconds_only = 0;
@@ -117,18 +123,21 @@ sub new {
         }
     }
 
-    if (defined ($args{'sign'}) ) {
-        # make sure this argument is all digits
-        if ($args{'sign'} !~ /[+-]/) {
+    if (defined ($args{sign}) ) {
+
+        # make sure this argument + or -
+        if ($args{sign} =~ m/[+-]/) {
             # if so, assign it
-            $self->{$_} = ($args{$_} eq "+") ? 1 : -1;
+            $self->{sign} = ($args{sign} eq "+") ? 1 : -1;
+            $verified->{sign} = ($args{sign} eq "+") ? '+' : '-';
         } else {
-            carp ("Parameter $_ contains a value other than + or - : " . $args{$_} . "\n");
+            carp ("Parameter sign contains a value other than + or - : "
+                . $args{sign} . "\n");
         }
         
     }
 
-        # If a number is given, convert it to hours, minutes, and seconds,
+    # If a number is given, convert it to hours, minutes, and seconds,
     # but *don't* extract days -- we want it to represent an absolute
     # amount of time, regardless of timezone
     if ($seconds_only) { # if we were given an integer time_t
@@ -144,8 +153,7 @@ sub new {
     }
     
     return undef unless %args;
-
-    
+   
     return $self;
 }
 
@@ -174,7 +182,9 @@ sub sign {
 
 sub weeks {
     my ($self) = @_;
-    return ${$self->_wd}[0];
+    my $w = ${$self->_wd}[0];
+    return unless $w;
+    return $self->{sign} * $w;
 }
 
 #}}}
@@ -183,7 +193,9 @@ sub weeks {
 
 sub days {
     my ($self) = @_;
-    return ${$self->_wd}[1];
+    my $d = ${$self->_wd}[1];
+    return unless $d;
+    return  $self->{sign} * $d;
 
 } #}}}
 
@@ -191,7 +203,9 @@ sub days {
 
 sub hours {
     my ($self) = @_;
-    return ${$self->_hms}[0];
+    my $h = ${$self->_hms}[0];
+    return unless $h;
+    return $self->{sign} * $h;
 }
 
 #}}}
@@ -200,7 +214,9 @@ sub hours {
 
 sub minutes {
     my ($self) = @_;
-    return ${$self->_hms}[1];
+    my $m = ${$self->_hms}[1];
+    return unless $m;
+    return $self->{sign} * $m;
 }
 
 #}}}
@@ -209,7 +225,9 @@ sub minutes {
 
 sub seconds {
     my ($self) = @_;
-    return ${$self->_hms}[2];
+    my $s = ${$self->_hms}[2];
+    return unless $s;
+    return $self->{sign} * $s;
 }
 
 #}}}
@@ -261,7 +279,7 @@ days.
 sub as_days {
     my ($self) = @_;
     my $wd = $self->_wd;
-    return $wd->[0]*7 + $wd->[1];
+    return $self->{sign} * ( $wd->[0]*7 + $wd->[1] );
 }# }}}
 
 #{{{ sub as_ical 
@@ -336,6 +354,8 @@ sub as_elements {
 
 #}}}
 
+# INTERNALS {{{
+
 =head1 INTERNALS
 
 head2 GENERAL MODEL
@@ -353,13 +373,19 @@ Converts a RFC2445 DURATION format string to the internal storage format.
 
 =cut
 
+#}}}
+
+# sub _set_from_ical (internal) {{{
+
 sub _set_from_ical {
     my ($self, $str) = @_;
 
     my $parsed_values = _parse_ical_string($str);
     
     return $self->_set_from_components($parsed_values);
-}
+} # }}}
+
+# sub _parse_ical_string (internal) {{{
 
 =head2 _parse_ical_string ($string)
 
@@ -414,7 +440,9 @@ sub _parse_ical_string {
     $return->{'sign'} = $sign;
 
     return $return;
-}
+} # }}}
+
+# sub _set_from_components (internal) {{{
 
 =head2 _set_from_components ($self, $hashref)
 
@@ -446,8 +474,9 @@ sub _set_from_components {
     }
 
     return $self;
-}
+} # }}}
 
+# sub _set_from_ical (internal) {{{
 
 =head2 _set_from_ical ($self, $num_seconds)
 
@@ -469,9 +498,9 @@ sub _set_from_seconds {
 
 
     return $self;
-}
+} # }}}
 
-
+# sub _hms (internal) {{{
 
 =head2 $self->_hms();
 
@@ -500,7 +529,9 @@ sub _hms {
         print "returning undef\n";
         return undef;
     }
-}
+} # }}}
+
+# sub _wd (internal) {{{
 
 =head2 $self->_wd() 
 
@@ -530,6 +561,6 @@ sub _wd  {
     } else {
         return undef;
     }
-}
+} # }}}
 
 1;

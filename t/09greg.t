@@ -44,43 +44,47 @@ my @mlen=(0,31,0,31,30,31,30,31,31,30,31,30,31);
 my ($dno,$y,$m,$dno2,$y2,$m2,$d2,$mlen) = (-1753530,-4800,1);
 
 print "# this may take a minute...\n";
-while ($y <= 4800) {
+while ( $y <= 4800 ) {
+
     # test $y,$m,1
     ++$dno;
-    $dno2 = Date::ICal::greg2jd($y,$m,1);
-    if ($dno != $dno2) {
-	is($dno2, $dno,
-	   "greg torture test: greg2jd($y,$m,1) should be $dno");
-	last;
+    $dno2 = Date::ICal::greg2jd( $y, $m, 1 );
+    if ( $dno != $dno2 ) {
+        is( $dno2, $dno, "greg torture test: greg2jd($y,$m,1) should be $dno" );
+        last;
     }
-    ($y2,$m2,$d2) = Date::ICal::jd2greg($dno);
-    if ($y2 != $y || $m2 != $m || $d2 != 1) {
-	is("$y2/$m2/$d2", "$y/$m/1",
-	   "greg torture test: jd2greg($dno) should be $y/$m/1");
-	last;
+    ( $y2, $m2, $d2 ) = Date::ICal::jd2greg($dno);
+
+    if ( $y2 != $y || $m2 != $m || $d2 != 1 ) {
+        is( "$y2/$m2/$d2", "$y/$m/1",
+          "greg torture test: jd2greg($dno) should be $y/$m/1" );
+        last;
     }
 
     # test $y,$m,$mlen
-    $mlen = $mlen[$m] || ($y%4 ? 28 : $y%100 ? 29 : $y%400 ? 28 : 29);
-    $dno += $mlen-1;
-    $dno2 = Date::ICal::greg2jd($y,$m,$mlen);
-    if ($dno != $dno2) {
-	is($dno2, $dno,
-	   "greg torture test: greg2jd($y,$m,$mlen) should be $dno");
-	last;
+    $mlen = $mlen[$m] || ( $y % 4 ? 28 : $y % 100 ? 29 : $y % 400 ? 28 : 29 );
+    $dno += $mlen - 1;
+    $dno2 = Date::ICal::greg2jd( $y, $m, $mlen );
+    if ( $dno != $dno2 ) {
+        is( $dno2, $dno,
+          "greg torture test: greg2jd($y,$m,$mlen) should be $dno" );
+        last;
     }
-    ($y2,$m2,$d2) = Date::ICal::jd2greg($dno);
-    if ($y2 != $y || $m2 != $m || $d2 != $mlen) {
-	is("$y2/$m2/$d2", "$y/$m/$mlen",
-	   "greg torture test: jd2greg($dno) should be $y/$m/$mlen");
-	last;
+    ( $y2, $m2, $d2 ) = Date::ICal::jd2greg($dno);
+
+    if ( $y2 != $y || $m2 != $m || $d2 != $mlen ) {
+        is( "$y2/$m2/$d2", "$y/$m/$mlen",
+          "greg torture test: jd2greg($dno) should be $y/$m/$mlen" );
+        last;
     }
 
     # and on to the next month...
-    if (++$m > 12) {
-	$m = 1; ++$y;
-	print "\r$y     " unless $harness || $y%100;
+    if ( ++$m > 12 ) {
+        $m = 1;
+        ++$y;
+        print "\r$y     " unless $harness || $y % 100;
     }
 }
 print "\n" unless $harness;
 pass("greg torture test") if $y==4801;
+

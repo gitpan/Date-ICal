@@ -35,6 +35,10 @@ WriteMakefile(
 sub MY::postamble {
     package MY;
     "\npredist: all\n" .
-    "\tcvs2cl -r -b -t -f Changes\n"
+    "\tcvs2cl -r -b -t -f Changes\n".
+    "\techo '# vim: filetype=changelog' >> Changes\n".
+    "\tpod2text lib/Date/ICal.pm >! README\n".
+    "\techo '------------------------------------------------' >> README\n".
+    "\tpod2text lib/Date/ICal/Duration.pm >> README\n"
 }
 

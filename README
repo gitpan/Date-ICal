@@ -2,7 +2,7 @@ NAME
     Date::ICal - Perl extension for ICalendar date objects.
 
 VERSION
-    $Revision: 1.2 $
+    $Revision: 1.66 $
 
 SYNOPSIS
         use Date::ICal;
@@ -215,12 +215,31 @@ METHODS
 
       $duration = $date1 - $date2;
 
-    Simple date subtraction. Returns a hashref containing duration
-    components D (days) H (hours) M (mins) S (seconds) and 'duration' (a
-    duration string).
+    Subtract one Date::ICal object from another to give a duration - the
+    length of the interval between the two dates. The return value is a
+    Date::ICal::Duration object (qv) and allows you to get at each of the
+    individual components, or the entire duration string:
 
-    WARNING. This API is just a suggestion, and may not end up being the
-    final API. Don't rely on it too seriously.
+        $d = $date1 - $X;
+
+    Note that $X can be any of the following:
+
+    If $X is another Date::ICal object (or subclass thereof) then $d will be
+    a Date::ICal::Duration object.
+
+        $week = $d->weeks; # how many weeks apart?
+        $days = $d->as_days; # How many days apart?
+
+    If $X is a duration string, or a Date::ICal::Diration object, then $d
+    will be an object in the same class as $date1;
+
+        $newdate = $date - $duration; 
+
+  clone
+
+        $copy = $date->clone;
+
+    Returns a replica of the date object, including all attributes.
 
   compare
 
@@ -277,21 +296,30 @@ METHODS
     attribute of gmtime (or localtime) except that it works outside of the
     epoch.
 
-hour
+  day_of_week
+
+        my $day_of_week = $date->day_of_week
+
+    Returns the day of week as 0..6 (0 is Sunday, 6 is Saturday).
+
+  hour
+
         my $hour = $date->hour
 
     Returns the hour of the day.
 
     Hour is in the range 0..23
 
-min
+  min
+
         my $min = $date->min;
 
     Returns the minute.
 
     Minute is in the range 0..59
 
-sec
+  sec
+
         my $sec = $date->sec;
 
     Returns the second.
@@ -299,7 +327,8 @@ sec
     Second is in the range 0..60. The value of 60 is (maybe) needed for leap
     seconds. But I'm not sure if we're going to go there.
 
-julian
+  julian
+
       my $jd = $date->jd;
 
     Returns a listref, containing two elements. The date as a julian day,
@@ -316,22 +345,178 @@ TODO
     - add gmtime and localtime methods, perhaps?
     - Fix the INTERNALS file so that it actually reflects reality
 INTERNALS
-        Please see the file INTERNALS for discussion on the internals.
+    Please see the file INTERNALS for discussion on the internals.
 
 AUTHOR
-        Rich Bowen (DrBacchus) rbowen@rcbowen.com
+    Rich Bowen (DrBacchus) rbowen@rcbowen.com
 
-        And the rest of the Reefknot team. See the source for a full list of
-        patch contributors and version-by-version notes.
+    And the rest of the Reefknot team. See the source for a full list of
+    patch contributors and version-by-version notes.
 
 SEE ALSO
-        datetime@perl.org mailing list
+    datetime@perl.org mailing list
 
-        http://reefknot.org/
+    http://reefknot.org/
 
-        http://dates.rcbowen.com/
+    http://dates.rcbowen.com/
 
-        Time::Local
+    Time::Local
 
-        Net::ICal
+    Net::ICal
+
+------------------------------------------------
+NAME
+    Date::ICal::Duration - durations in iCalendar format, for math purposes.
+
+VERSION
+    $Revision: 1.10 $
+
+SYNOPSIS
+        use Date::ICal::Duration;
+
+        $d = Date::ICal::Duration->new( ical => '-P1W3DT2H3M45S' );
+
+        $d = Date::ICal::Duration->new( weeks => 1, 
+                                        days => 1,
+                                        hours => 6,
+                                        minutes => 15,
+                                        seconds => 45); 
+
+        # a one hour duration, without other components
+        $d = Date::ICal::Duration->new( seconds => "3600"); 
+
+        # Read-only accessors:
+        $d->weeks;
+        $d->days;
+        $d->hours;
+        $d->minutes;
+        $d->seconds;
+        $d->sign;
+
+        # TODO: Resolve sign() discussion from rk-devel and update synopsis.
+    
+        $d->as_seconds ();   # returns just seconds
+        $d->as_elements ();  # returns a hash of elements, like the accessors above
+        $d->as_ical();       # returns an iCalendar duration string
+    
+DESCRIPTION
+    This is a trivial class for representing duration objects, for doing
+    math in Date::ICal
+
+AUTHOR
+    Rich Bowen, and the Reefknot team (www.reefknot.org)
+
+    Last touched by $Author: rbowen $
+
+METHODS
+    Date::ICal::Duration has the following methods available:
+
+  new
+
+    A new Date::ICal::Duration object can be created with an iCalendar
+    string :
+
+        my $ical = Date::ICal::Duration->new ( ical => 'P3W2D' );
+        # 3 weeks, 2 days, positive direction
+        my $ical = Date::ICal::Duration->new ( ical => '-P6H3M30S' );
+        # 6 hours, 3 minutes, 30 seconds, negative direction
+    
+    Or with a number of seconds:
+
+        my $ical = Date::ICal::Duration->new ( seconds => "3600" );
+        # one hour positive
+
+    Or, better still, create it with components
+
+        my $date = Date::ICal::Duration->new ( 
+                               weeks => 6, 
+                               days => 2, 
+                               hours => 7,
+                               minutes => 15,
+                               seconds => 47,
+                               sign => "+"
+                               );
+
+    The sign defaults to "+", but "+" and "-" are legal values.
+
+  sign, weeks, days, hours, minutes, seconds
+
+    Read-only accessors for the elements of the object.
+
+  as_seconds
+
+    Returns the duration in raw seconds.
+
+    WARNING -- this folds in the number of days, assuming that they are
+    always 86400 seconds long (which is not true twice a year in areas that
+    honor daylight savings time). If you're using this for date arithmetic,
+    consider using the *add()* method from a the Date::ICal manpage object,
+    as this will behave better. Otherwise, you might experience some error
+    when working with times that are specified in a time zone that observes
+    daylight savings time.
+
+  as_days
+
+        $days = $duration->as_days;
+
+    Returns the duration as a number of days. Not to be confused with the
+    "days" method, this method returns the total number of days, rather than
+    mod'ing out the complete weeks. Thus, if we have a duration of 33 days,
+    "weeks" will return 4, "days" will return 5, but "as_days" will return
+    33.
+
+    Note that this is a lazy convenience function which is just weeks*7 +
+    days.
+
+  as_ical
+
+    Return the duration in an iCalendar format value string (e.g.,
+    "PT2H0M0S")
+
+  as_elements
+
+    Returns the duration as a hashref of elements.
+
+INTERNALS
+    head2 GENERAL MODEL
+
+    Internally, we store 3 data values: a number of days, a number of
+    seconds (anything shorter than a day), and a sign (1 or -1). We are
+    assuming that a day is 24 hours for purposes of this module; yes, we
+    know that's not completely accurate because of daylight-savings-time
+    switchovers, but it's mostly correct. Suggestions are welcome.
+
+    NOTE: The methods below SHOULD NOT be relied on to stay the same in
+    future versions.
+
+  _set_from_ical ($self, $duration_string)
+
+    Converts a RFC2445 DURATION format string to the internal storage
+    format.
+
+  _parse_ical_string ($string)
+
+    Regular expression for parsing iCalendar into usable values.
+
+  _set_from_components ($self, $hashref)
+
+    Converts from a hashref to the internal storage format. The hashref can
+    contain elements "sign", "weeks", "days", "hours", "minutes", "seconds".
+
+  _set_from_ical ($self, $num_seconds)
+
+    Sets internal data storage properly if we were only given seconds as a
+    parameter.
+
+  $self->_hms();
+
+    Return an arrayref to hours, minutes, and second components, or undef if
+    nsecs is undefined. If given an arrayref, computes the new nsecs value
+    for the duration.
+
+  $self->_wd()
+
+    Return an arrayref to weeks and day components, or undef if ndays is
+    undefined. If Given an arrayref, computs the new ndays value for the
+    duration.
 

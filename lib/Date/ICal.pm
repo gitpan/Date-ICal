@@ -1,9 +1,9 @@
-# $Id: ICal.pm,v 1.61 2001/12/16 22:15:42 rbowen Exp $
+# $Id: ICal.pm,v 1.66 2001/12/27 02:25:35 rbowen Exp $
 package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths %add_units);
-$VERSION = (qw'$Revision: 1.61 $')[1];
+$VERSION = (qw'$Revision: 1.66 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -23,7 +23,7 @@ Date::ICal - Perl extension for ICalendar date objects.
 
 =head1 VERSION
 
-$Revision: 1.61 $
+$Revision: 1.66 $
 
 =head1 SYNOPSIS
 
@@ -717,24 +717,26 @@ length of the interval between the two dates. The return value is a
 Date::ICal::Duration object (qv) and allows you to get at each of the
 individual components, or the entire duration string:
 
-    $d = $date1 - $date2;
+    $d = $date1 - $X;
+
+Note that $X can be any of the following:
+
+If $X is another Date::ICal object (or subclass thereof) then $d will be
+a Date::ICal::Duration object.
+
     $week = $d->weeks; # how many weeks apart?
     $days = $d->as_days; # How many days apart?
 
-TODO: In future versions, one will be able to do one or more of the
-following:
+If $X is a duration string, or a Date::ICal::Diration object, then $d
+will be an object in the same class as $date1;
 
     $newdate = $date - $duration; 
-    # $duration is a Date::ICalDuration object, or perhaps an ical
-    # duration string.
-
-    $newdate = $date + $duration;
-    # likewise
 
 =cut
 
 sub subtract {
     my ( $date1, $date2, $reversed ) = @_;
+    my $dur;
 
     # If the order of the arguments was reversed, overload tells us
     # about it in the third argument.
@@ -742,17 +744,59 @@ sub subtract {
         ( $date2, $date1 ) = ( $date1, $date2 );
     }
 
-    # However, it really does not make much sense unless both objects
-    # are ... um ... objects
-# TODO: check to see if $date2 is either a D::I::Duration object, or a
-# ical duration string.
-    return undef unless ref($date1) && ref($date2);
+    if (ref $date1 && ref $date2) {
+    # If $date1 is a Date::ICal object, and $date2 is a Duration object,
+    # then we should subtract and get a date.
+        if ((ref $date2) eq 'Date::ICal::Duration') {
+            my $seconds = $date2->as_seconds;
+            my $ret = $date1->clone;
+            $ret->add( seconds => -1 * $seconds );
+            return $ret;
 
-    # OK, we have two D::I objects
-    my $days = $date1->{julian} - $date2->{julian};
-    my $secs = $date1->{julsec} - $date2->{julsec};
+        } else {
+    # If $date2 is a Date::ICal object, or some class thereof, we should
+    # subtract and get a duration
 
-    return Date::ICal::Duration->new( days => $days, seconds => $secs );
+            my $days = $date1->{julian} - $date2->{julian};
+            my $secs = $date1->{julsec} - $date2->{julsec};
+
+            return Date::ICal::Duration->new(
+              days    => $days,
+              seconds => $secs
+            );
+        } 
+    } elsif ( ref $date1 && 
+              ( $dur = Date::ICal::Duration->new( ical => $date2 ) )
+            ) {
+    # If $date1 is a Date::ICal object, and $date2 is a duration string,
+    # we should subtract and get a date
+        return $date1 - $dur; # Is that cheating?
+
+    # Otherwise, we should call them nasty names and return undef
+    } else {
+        warn "Moron";
+        return;
+    }
+
+} # }}}
+
+# sub clone {{{
+
+=head2 clone
+
+    $copy = $date->clone;
+
+Returns a replica of the date object, including all attributes.
+
+=cut
+
+sub clone {
+    my $self = shift;
+    my $class = ref $self;
+    my %hash = %$self;
+    my $new = \%hash;
+    bless $new, $class;
+    return $new;
 } # }}}
 
 # sub compare {{{
@@ -1012,9 +1056,24 @@ sub days_this_year {
     return $jd - $janone;
 }    #}}}
 
+# sub day_of_week {{{
+
+=head2 day_of_week
+
+    my $day_of_week = $date->day_of_week
+
+Returns the day of week as 0..6 (0 is Sunday, 6 is Saturday).
+
+=cut
+
+sub day_of_week {
+    my $self = shift;
+    return $self->{julian} % 7;
+}    #}}}
+
 # sub hour {{{
 
-=head1 hour
+=head2 hour
 
     my $hour = $date->hour
 
@@ -1031,7 +1090,7 @@ sub hour {
 
 # sub min {{{
 
-=head1 min
+=head2 min
 
     my $min = $date->min;
 
@@ -1052,7 +1111,7 @@ sub minute { return min(@_); }
 
 # sub sec {{{
 
-=head1 sec
+=head2 sec
 
     my $sec = $date->sec;
 
@@ -1100,7 +1159,7 @@ sub parsetime {
 
 # sub julian/jd #{{{
 
-=head1 julian
+=head2 julian
 
   my $jd = $date->jd;
 
@@ -1156,6 +1215,8 @@ sub _calc_local_offset {
 =item - add gmtime and localtime methods, perhaps?
 
 =item - Fix the INTERNALS file so that it actually reflects reality
+
+=back
 
 =head1 INTERNALS
 

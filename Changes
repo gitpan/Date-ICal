@@ -1,3 +1,85 @@
+2001-12-26 21:37  rbowen
+
+	* t/: 09greg.t (1.2), 10subtract.t (1.5): Spacing changes (courtesy
+	of perltidy) in the tests, so that I can better read what is going
+	on here. No functional change.
+
+2001-12-26 21:27  rbowen
+
+	* Makefile.PL (1.19): Add a vim syntax highlighting line to the
+	Change log file so that it looks pretty.
+
+2001-12-26 21:25  rbowen
+
+	* lib/Date/ICal.pm (1.66): No longer need to do strange workaround
+	to subtract dates resulting in negative duration. It Just Works
+	(tm).
+
+2001-12-26 21:07  rbowen
+
+	* lib/Date/ICal/Duration.pm (1.10), t/11duration.t (1.5): Permit
+	the creation of Duration objects with negative attributes. Note
+	that all attributes have to have the same sign. Mixed-sign
+	attributes will result in the entire duration being negative. This
+	could stand to be documented more clearly.  Also, all accessors
+	have been modified to explicitly return undef if that attribute has
+	zero value. I'm not sure if this is desired, but it's the way that
+	it is documented, and what the tests expect.  Tests added to verify
+	all this stuff.
+
+2001-12-26 20:21  rbowen
+
+	* Makefile.PL (1.18): Add the Duration documentation to the README
+	on make dist
+
+2001-12-26 20:15  rbowen
+
+	* lib/Date/ICal/Duration.pm (1.9): Code folds. No functional
+	change.
+
+2001-12-26 15:55  rbowen
+
+	* lib/Date/ICal.pm (1.65), t/10subtract.t (1.4): A small
+	work-around because D::I::Duration does not correctly handle
+	negative arguments yet. See diff 1.7 -> 1.8 of
+	Date::ICal::Duration.  When D::I::Duration correctly handles
+	negative arguments, this patch should be mostly reversed.  Added
+	tests for subtracting dates to get negative duration.
+
+2001-12-26 15:50  rbowen
+
+	* lib/Date/ICal/Duration.pm (1.8): This is step one. Components now
+	return signed. And the 'sign' argument is being honored now, rather
+	than being discarded. Need to add tests for this stuff. Still does
+	not correctly handle negative arguments.
+
+2001-12-20 16:04  rbowen
+
+	* lib/Date/ICal.pm (1.64), t/10subtract.t (1.3): Added the ability
+	to subtract durations from a date, either as a Date::ICal::Duration
+	object, or as a ICal duration string. Tests to match.
+
+2001-12-20 10:20  rbowen
+
+	* lib/Date/ICal/Duration.pm (1.7): Documentation: The parameter is
+	'ical' not 'string' to create an object with an ical duration
+	string.
+
+2001-12-19 07:52  rbowen
+
+	* Makefile.PL (1.17), README (1.4): As suggested, generatel README
+	at release time, rather than having it in CVS.
+
+2001-12-18 21:24  rbowen
+
+	* README (1.3), lib/Date/ICal.pm (1.63): Bring README up to date
+	with the POD. Minor POD fix in ICal.pm
+
+2001-12-18 21:21  rbowen
+
+	* lib/Date/ICal.pm (1.62): Patch from Yitzchak. Adds day_of_week
+	method. Other minor POD fixes.
+
 2001-12-16 19:21  rbowen
 
 	* MANIFEST (1.9, Date-ICal-1_61): Added t/11duration.t to MANIFEST
@@ -575,3 +657,4 @@
 	date-ical-1_18_01) (utags: Date-ICal-1_14): Moving Date::ICal to
 	sourceforge reefknot repository. I hope I don't regret this.
 
+# vim: filetype=changelog
