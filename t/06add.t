@@ -154,7 +154,7 @@ for (1..99) {
     $t = Date::ICal->new(ical => '20000228Z');
     $t->add(year => $_);
     my $x = sprintf '%02d', $_;
-    is($t->ical, '20' . $x . '0228Z', 'Adding $_ years');
+    is($t->ical, '20' . $x . '0228Z', "Adding $_ years");
 }
 
 # Test a bunch of years, after leap day
@@ -162,7 +162,7 @@ for (1..99) {
     $t = Date::ICal->new(ical => '20000328Z');
     $t->add(year => $_);
     my $x = sprintf '%02d', $_;
-    is($t->ical, '20' . $x . '0328Z', 'Adding $_ years');
+    is($t->ical, '20' . $x . '0328Z', "Adding $_ years");
 }
 
 # And more of the same, starting on a non-leap year
@@ -172,7 +172,7 @@ for (1..97) {
     $t = Date::ICal->new(ical => '20020228Z');
     $t->add(year => $_);
     my $x = sprintf '%02d', $_ + 2;
-    is($t->ical, '20' . $x . '0228Z', 'Adding $_ years');
+    is($t->ical, '20' . $x . '0228Z', "Adding $_ years");
 }
 
 # Test a bunch of years, after leap day
@@ -180,7 +180,26 @@ for (1..97) {
     $t = Date::ICal->new(ical => '20020328Z');
     $t->add(year => $_);
     my $x = sprintf '%02d', $_ + 2;
-    is($t->ical, '20' . $x . '0328Z', 'Adding $_ years');
+    is($t->ical, '20' . $x . '0328Z', "Adding $_ years");
 }
 
+# subtract years
+for (1..97) {
+    $t = Date::ICal->new(ical => '19990301Z');
+    $t->add(year => -$_);
+    my $x = sprintf '%02d', 99 - $_;
+    is($t->ical, '19' . $x . '0301Z', "Subtracting $_ years");
+}
+
+# test some old bugs
+
+# bug adding months where current month + months added were > 25
+$t = Date::ICal::->new(ical=>'19971201Z');
+$t->add( month=>14 );
+is($t->ical, '19990201Z', 'Adding months--rollover year' );
+
+# bug subtracting months with year rollover
+$t = Date::ICal::->new(ical=>'19970101Z');
+$t->add( month=>-1 );
+is($t->ical, '19961201Z', 'Subtracting months--rollover year');
 

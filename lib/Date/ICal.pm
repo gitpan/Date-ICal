@@ -1,13 +1,16 @@
+# $Id: ICal.pm,v 1.61 2001/12/16 22:15:42 rbowen Exp $
 package Date::ICal;
 use strict;
 
-use vars qw($VERSION $localzone $localoffset @months @leapmonths);
-$VERSION = (qw'$Revision: 1.57 $')[1];
+use vars qw($VERSION $localzone $localoffset @months @leapmonths %add_units);
+$VERSION = (qw'$Revision: 1.61 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
+use Date::ICal::Duration;
 use overload '<=>' => 'compare',
-  'fallback' => 1;
+             'fallback' => 1,
+             '-' => \&subtract;
 
 $localzone   = $ENV{TZ} || 0;
 $localoffset = _calc_local_offset();
@@ -20,7 +23,7 @@ Date::ICal - Perl extension for ICalendar date objects.
 
 =head1 VERSION
 
-$Revision: 1.57 $
+$Revision: 1.61 $
 
 =head1 SYNOPSIS
 
@@ -136,9 +139,7 @@ sub new {
         $year += 1900;
         $month++;
 
-        # TODO: is this what we really want here? I think so --srl
         $zflag = 1;    # epoch times are by definition in GMT
-
     }    #}}}
 
     # Date is specified as ical string#{{{
@@ -486,118 +487,188 @@ sub offset {
 
 =head2 add
 
-    $date->add( %hash ); # Hash of day, hour, min, etc, values
-    $date->add( ical => $ical_duration_string );
+    $self->add( year => 3, month => 2, week => 1, day => 12,
+                hour => 1, minute => 34, sec => 59 );
+    $date->add( duration => 'P1WT1H1M1S' ); # add 1 wk, 1 hr, 1 min, and 1 sec
 
 Adds a duration to a Date::ICal object.
 
-Duration should be passed in as either an ical string, or as a hash of
-date/time properties.
+Supported paraters are: duration, eom_mode, year, month, week, day,
+hour, min, sec or seconds.
+
+'duration' is a ICalendar duration string (see duration_value).
+
+If a value is undefined or omitted, 1 is assumed:
+
+    $ical->add( 'minute' ); # add a minute
 
 The result will be normalized. That is, the output time will have
 meaningful values, rather than being 48:73 pm on the 34th of 
 hexadecember.
 
-   $self->add( month=>2 );
-   $self->add( duration =>'P1W' );
+Adding months or years can be done via three different methods,
+specified by the eom_mode parameter, which then applies to all
+additions (or subtractions) of months or years following it in the
+parameter list.
+
+The default, eom_mode => 'wrap', means adding months or years that
+result in days beyond the end of the new month will roll over into the
+following month.  For instance, adding one year to Feb 29 will result
+in Mar 1.
+
+If you specify eom_mode => 'limit', the end of the month is never
+crossed.  Thus, adding one year to Feb 29, 2000 will result in Feb 28,
+2001.  However, adding three more years will result in Feb 28, 2004,
+not Feb 29.
+
+If you specify eom_mode => 'preserve', the same calculation is done as
+for 'limit' except that if the original date is at the end of the
+month the new date will also be.  For instance, adding one month to
+Feb 29, 2000 will result in Mar 31, 2000.
+
+All additions are performed in the order specified.  For instance,
+with the default setting of eom_mode => 'wrap', adding one day and one
+month to Feb 29 will result in Apr 1, while adding one month and one
+day will result in Mar 30.
 
 =cut
 
 sub add {
     my $self = shift;
-    my %args = @_;
-
-    carp "Date::ICal::add was called by an undefined object"
-      unless defined($self);
-    carp "Date::ICal::add was called without an attribute arg"
-      unless ( keys %args );
-
-    my ( $seconds, $days );
-
-    if ( defined $args{duration} ) {
-
-        ( $days, $seconds ) = duration_value( $args{duration} );
-
-      } elsif ( defined $args{seconds} )
-    {
-        $days    = 0;
-        $seconds = $args{seconds};
-
-      } else {
-
-        $seconds = 0;
-        $seconds += $args{sec} if defined $args{sec};
-        $seconds += $args{min} * 60 if defined $args{min};
-        $seconds += $args{hour} * 60 * 60 if defined $args{hour};
-
-        $days = 0;
-        $days += $args{day} if defined $args{day};
-        $days += $args{week} * 7 if defined $args{week};
-
-        if ( $args{month} ) {
-            my @months = months( $self->year );
-            my $start  = $months[ $self->month - 1 ];
-            my $end    = $self->month + $args{month};
-            my $add    = 0;
-            if ( $end > 12 ) {
-                $end -= 12;
-                $add    = $months[12];
-                @months = months( $self->year + 1 );
-            }
-            $end = $months[ $end - 1 ] + $add;
-
-            $days += $end - $start;
-        }
-
-        if ( $args{year} ) {
-            foreach my $year( $self->year .. $self->year + $args{year} - 1 ) {
-                my $leap = Date::Leapyear::isleap($year);
-                $days += 365 + $leap;
-            }
-
-            # Remove a day if the year that we started in was leap, but
-            # we started *after* the leap day
-            if ( Date::Leapyear::isleap( $self->year )
-              && days_this_year( $self->day, $self->month, $self->year ) >= 60 )
-            {
-                $days--;
-            }
-
-            # Add a day is the year we finish in is leap, and we end
-            # *after* the leap day
-            if ( Date::Leapyear::isleap( $self->year + $args{year} )
-              && days_this_year( $self->day, $self->month,
-              $self->year + $args{year} ) >= 60 )
-            {
-                $days++;
-            }
-        }
-
-    }
-
-    # ick, we really don't want this.
-    my $daycount = int( $seconds / 86400 );
-    $seconds -= ( $daycount * 86400 );
-    $days += $daycount;
-
-    $self->{julian} += $days;
-    $self->{julsec} += $seconds;
-
-    # Did we cross a day boundary?
-    if ( $self->{julsec} < 0 ) {
-        $self->{julian}--;
-        $self->{julsec} += 86400;
-      } elsif ( $self->{julsec} >= 86400 )
-    {
-        $self->{julian}++;
-        $self->{julsec} -= 86400;
-    }
+    carp "Date::ICal::add was called without an attribute arg" unless @_;
+    ( $self->{julian}, $self->{julsec}) =
+        _add($self->{julian}, $self->{julsec}, @_);
     return $self;
 }
 
 #}}}
 
+# sub _add {{{
+
+=begin internal
+
+    Add (or subtract) to a date/time.  First two parameters are
+    the jd and secs of the day.  For the rest, see the add method.
+    Returns the adjusted jd and secs.
+
+=end internal
+
+=cut
+
+# for each unit, specify what it changes by (0=day, 1=second, 2=month)
+# and by what factor
+
+%add_units = (year=>[2,12], month=>[2,1], week=>[0,7], day=>[0,1],
+              hour=>[1,3600], min=>[1,60], sec=>[1,1], seconds=>[1,1]);
+
+sub _add {
+    my ($jd, $secs) = splice(@_, 0, 2);
+    my $eom_mode = 0;
+    my ($add, $unit, $count);
+
+    # loop through unit=>count parameters
+    while (($unit, $count) = splice(@_, 0, 2)) {
+
+        if ($unit eq 'duration') { # add a duration string
+            my %dur;
+            @dur{'day','sec','month'} = duration_value($count);
+
+            # pretend these were passed to us as e.g. month=>1, day=>1, sec=>1.
+            # since months/years come first in the duration string, we
+            # put them first.
+            unshift @_, map $dur{$_} ? ($_,$dur{$_}) : (),
+                            'month', 'day', 'sec';
+            next;
+        } elsif ($unit eq 'eom_mode') {
+            if ($count eq 'wrap') { $eom_mode = 0 }
+            elsif ($count eq 'limit') { $eom_mode = 1 }
+            elsif ($count eq 'preserve') { $eom_mode = 2 }
+            else { carp "Unrecognized eom_mode, $count, ignored" }
+        } else {
+            unless ($add = $add_units{$unit}) {
+                carp "Unrecognized time unit, $unit, skipped";
+                next;
+            }
+
+            $count = 1 if !defined $count; # count defaults to 1
+            $count *= $add->[1]; # multiply by the factor for this unit
+
+            if ($add->[0] == 0) { # add to days
+                $jd += $count;
+            } elsif ($add->[0] == 1) { # add to seconds
+                $secs += $count;
+            } else {            # add to months
+                my ($y, $mo, $d);
+
+                _normalize_seconds( $jd, $secs );
+                if ($eom_mode == 2) { # sticky eom mode
+                    # if it is the last day of the month, make it the 0th
+                    # day of the following month (which then will normalize
+                    # back to the last day of the new month).
+                    ($y, $mo, $d) = jd2greg( $jd+1 );
+                    --$d;
+                } else {
+                    ($y, $mo, $d) = jd2greg( $jd );
+                }
+
+                if ($eom_mode && $d > 28) { # limit day to last of new month
+                    # find the jd of the last day of our target month
+                    $jd = greg2jd( $y, $mo+$count+1, 0 );
+
+                    # what day of the month is it? (discard year and month)
+                    my $lastday = scalar jd2greg( $jd );
+
+                    # if our original day was less than the last day,
+                    # use that instead
+                    $jd -= $lastday - $d if $lastday > $d;
+                } else {
+                    $jd = greg2jd( $y, $mo+$count, $d );
+                }
+            }
+        }
+    }
+
+    _normalize_seconds( $jd, $secs );
+}
+
+#}}}
+
+# sub _normalize_seconds {{{
+
+=begin internal
+
+    ($jd, $secs) = _normalize_seconds( $jd, $secs );
+
+    Corrects seconds that have gone into following or previous day(s).
+    Adjusts the passed days and seconds as well as returning them.
+
+=end internal
+
+=cut
+
+sub _normalize_seconds {
+    my $adj;
+
+    if ($_[1] < 0) {
+        $adj = int( ($_[1]-86399)/86400 );
+    } else {
+        $adj = int( $_[1]/86400 );
+    }
+    ($_[0] += $adj), ($_[1] -= $adj*86400);
+}
+
+#}}}
+
 # sub duration_value {{{
+
+=head2 duration_value
+
+Given a duration string, this function returns the number of days,
+seconds, and months represented by that duration. In that order. Seems
+odd to me. This should be considered an internal function, and you
+should expect the API to change in the very near future.
+
+=cut
 
 sub duration_value {
     my $str = shift;
@@ -606,6 +677,8 @@ sub duration_value {
             ([\+\-])?   (?# Sign)
             (P)     (?# 'P' for period? This is our magic character)
             (?:
+                (?:(\d+)Y)? (?# Years)
+                (?:(\d+)M)? (?# Months)
                 (?:(\d+)W)? (?# Weeks)
                 (?:(\d+)D)? (?# Days)
             )?
@@ -616,7 +689,7 @@ sub duration_value {
             )?
                 }x;
     my ( $sign, $magic ) = @temp[ 0 .. 1 ];
-    my ( $weeks, $days, $hours, $mins, $secs ) =
+    my ( $years, $months, $weeks, $days, $hours, $mins, $secs ) =
       map { defined($_) ? $_ : 0 } @temp[ 2 .. $#temp ];
 
     unless ( defined($magic) ) {
@@ -627,10 +700,60 @@ sub duration_value {
 
     my $s = $sign * ( $secs + ( $mins * 60 ) + ( $hours * 3600 ) );
     my $d = $sign * ( $days + ( $weeks * 7 ) );
-    return ( $d, $s );
+    my $m = $sign * ( $months + ( $years * 12 ) );
+    return ( $d, $s, $m );
 }
 
 #}}}
+
+# sub subtract {{{
+
+=head2 subtract
+
+  $duration = $date1 - $date2;
+
+Subtract one Date::ICal object from another to give a duration - the
+length of the interval between the two dates. The return value is a
+Date::ICal::Duration object (qv) and allows you to get at each of the
+individual components, or the entire duration string:
+
+    $d = $date1 - $date2;
+    $week = $d->weeks; # how many weeks apart?
+    $days = $d->as_days; # How many days apart?
+
+TODO: In future versions, one will be able to do one or more of the
+following:
+
+    $newdate = $date - $duration; 
+    # $duration is a Date::ICalDuration object, or perhaps an ical
+    # duration string.
+
+    $newdate = $date + $duration;
+    # likewise
+
+=cut
+
+sub subtract {
+    my ( $date1, $date2, $reversed ) = @_;
+
+    # If the order of the arguments was reversed, overload tells us
+    # about it in the third argument.
+    if ($reversed) {
+        ( $date2, $date1 ) = ( $date1, $date2 );
+    }
+
+    # However, it really does not make much sense unless both objects
+    # are ... um ... objects
+# TODO: check to see if $date2 is either a D::I::Duration object, or a
+# ical duration string.
+    return undef unless ref($date1) && ref($date2);
+
+    # OK, we have two D::I objects
+    my $days = $date1->{julian} - $date2->{julian};
+    my $secs = $date1->{julsec} - $date2->{julsec};
+
+    return Date::ICal::Duration->new( days => $days, seconds => $secs );
+} # }}}
 
 # sub compare {{{
 
@@ -673,6 +796,8 @@ sub compare {
 
 #}}}
 
+# internal stuff {{{
+
 =begin internal
 
  @months = months($year);
@@ -710,6 +835,8 @@ Returns the time of day as the number of seconds in the day.
 =end internal
 
 =cut
+
+# }}}
 
 # sub time_as_seconds {{{
 
@@ -945,6 +1072,8 @@ sub second { return sec(@_); }
 
 # }}}
 
+# sub parsetime {{{
+
 =begin internal
 
  ( $sec, $min, $hour ) = parsetime( $seconds );
@@ -955,8 +1084,6 @@ minutes, and hours of the current time.
 =end internal
 
 =cut
-
-# sub parsetime {{{
 
 sub parsetime {
     my $self = shift;
@@ -1028,6 +1155,8 @@ sub _calc_local_offset {
 
 =item - add gmtime and localtime methods, perhaps?
 
+=item - Fix the INTERNALS file so that it actually reflects reality
+
 =head1 INTERNALS
 
 Please see the file INTERNALS for discussion on the internals.
@@ -1050,184 +1179,6 @@ http://dates.rcbowen.com/
 Time::Local
 
 Net::ICal
-
-=cut
-
-#}}}
-
-# CVS History #{{{
-
-=head1 CVS History
-
-  $Log: ICal.pm,v $
-  Revision 1.57  2001/12/11 15:12:29  rbowen
-  I've removed some warnings, because we are basically warning when people
-  use documented default behavior. This is very irritating. I also need to
-  update the documentation so that it is more clear on this point, but for
-  the moment, this scratches my immediate itch. --DrBacchus
-
-  Revision 1.56  2001/12/01 03:25:00  rbowen
-  This is, I believe, the intent of Yitzchak's first two patches. There is
-  no content in this diff, just style things. Ran perltidy on it to make
-  the whole file conform to agreed-upon style standards. And standardized
-  the usage of code folding characters.
-
-  Revision 1.55  2001/11/28 02:00:16  rbowen
-  Able to add n years to a date via the add method. Tests to match.
-
-  Revision 1.54  2001/11/24 18:57:37  rbowen
-  Oops. I reversed the order of the argument list when I added this
-  function back in, thereby breaking all code that was calling it.
-
-  Revision 1.53  2001/11/24 16:25:10  rbowen
-  Since _seconds_from_offset returns a number, not a string, we only need
-  the sign if it is negative. Resolves some test failures that I was
-  seeing in t/08offset.t for negative offsets.
-
-  Revision 1.52  2001/11/24 03:42:39  rbowen
-  Resolves one of the test failures in offset/add - when add crossed a day
-  boundary by virtue of a difference in seconds, it was not compenting in
-  the day value, and could end up with negative times.
-
-  Revision 1.51  2001/11/24 03:11:25  rbowen
-  Added back in days_this_year method using new greg2jd method.
-
-  Revision 1.50  2001/11/24 02:54:22  rbowen
-  This is Yitzchak's patch to give us much more efficient gregorian <->
-  julian conversions, and to remove strange anomolous problems in the 17th
-  and 18 centuries. Note that we lose a few internal methods here, at
-  least one of which I'll be putting back in a minute.
-
-  Revision 1.49  2001/11/22 10:56:23  srl
-  This version incorporates a patch by Yitzchak Scott-Thoennes to
-  adjust the offset() API. It no longer takes integer seconds
-  as a parameter, because there's no programmatic way to tell the
-  difference between, say, +3600 (UTC+1 in seconds) and +3600 (UTC+36,
-  if you interpret that as an HHMM value).
-
-  I also refactored things a bit, creating an _offset_from_seconds
-  method to match _offset_to_seconds; this should eliminate some
-  duplication. There's also new POD to clear up some confusion about
-  new(offset => foo) used together with offset().
-
-  Revision 1.48  2001/11/22 09:22:24  srl
-  API-consistency patch from Yitzchak Scott-Thoennes <sthoenna@efn.org>;
-  Makes the ical() method take a hash of parameters, not a hashref,
-  so that ical() is like the other methods. This crept in around 1.44,
-  and it shouldn't have. My mistake.
-
-  Revision 1.47  2001/11/22 09:02:34  srl
-  Fixed some 5.6isms; patch contributed by Yitzchak Scott-Thoennes
-  <sthoenna@efn.org>.
-
-  Revision 1.46  2001/11/15 13:25:04  srl
-  Minor patches to tests; another piece of optimization from Mike Heins.
-
-  Revision 1.45  2001/11/15 05:32:17  srl
-  Added benchmark.pl to help developers in optimizing the module.
-  Also modified new() to warn more clearly if the $TZ environment
-  variable isn't set, and not to utterly fail tests if $TZ isn't there.
-
-  Revision 1.44  2001/11/15 05:11:32  srl
-  Further patches from Mike Heins, plus some documentation from me:
-  	- added localtime argument to ical() for output in localtime.
-  	  Added documentation about the localtime argument. Note
-            that $ENV{$TZ} is now relevant to some of the module's behavior.
-  	- removed a memoize() that wasn't providing significant speed
-  	  improvements.
-  	- minor optimization of _calc_local_offset
-
-  Revision 1.43  2001/11/15 04:20:38  srl
-  Committed another small patch by Mike Heins, which precalculates
-  the values returned by the months() function so that the module
-  is faster at runtime.
-
-  Revision 1.42  2001/11/15 04:11:13  srl
-  Another patch from Mike Heins (mheins@minivend.com); an optimizing
-  cheat for leapyears; uses a precalculated table of values instead
-  of always calculating leapyear values. I edited Mike's patch slightly
-  so that @leapcheat isn't a package global.
-
-  Revision 1.41  2001/11/15 03:58:34  srl
-  Incorporated part of a patch by Mike Heins (mheins@minivend.com);
-  an optimization. Internal storage of julian times is now in
-  $self->{julian} and $self->{julsec}, instead of using an array.
-  This gives us slightly better speed. Also, made some of the UTC
-  behaviors slightly more consistent.
-
-  Revision 1.40  2001/10/16 10:33:44  srl
-  Further fixes to the offset() method. This code isn't as well-tested
-  as I'd like it to be, but it seems to do the right thing for all the
-  tests that are there. I had to revise many of the tests, because
-  the API semantics have changed. Times must now be explicitly
-  specified with a Z in order to be handled as UTC.
-
-  Revision 1.39  2001/10/10 02:58:29  srl
-  Added some tests, reorganized some code to prepare spaces for
-  offset/timezone-aware output. Added at least one test that's
-  known to fail for purposes of knowing when we succeed. :)
-
-  Revision 1.38  2001/10/09 04:28:58  srl
-  Started working on code to properly handle times with offsets from GMT.
-  added a new _calc_local_offset method to figure out what the
-  current machine's UTC offset is. We need tests for this that will
-  work in any timezone; patches welcome.
-
-  Revision 1.37  2001/09/30 13:19:14  lotr
-  * Oops, forgot some bits when I added month to add()
-  * use overload for compare
-
-  Revision 1.36  2001/09/29 11:01:55  lotr
-  Add the ability to add months to a date. Needed for Net::ICal::Recurrence
-
-  Revision 1.35  2001/09/26 15:26:09  lotr
-  * fix off-by-one error in months() and add tests for that
-
-  Revision 1.34  2001/09/12 03:26:23  rbowen
-  There's no particular reason to have Date::ICal be 5.6 dependant.
-
-  Revision 1.33  2001/08/25 12:20:30  rbowen
-  Fixed bug reported by Chris Jones. In sub add, I was checking one
-  attribute and using another. Added tests for this bug, and for adding
-  durations by attribute.
-
-  Revision 1.32  2001/08/10 03:27:47  srl
-  Started adding timezone support by making an offset() method and an offset
-  property. This still needs to be wired into the new() method and the
-  output methods, but we have to resolve some interface details first.
-
-  Revision 1.31  2001/08/07 02:41:11  rbowen
-  Test::More gets angry if there are no tests.
-
-  Revision 1.30  2001/08/07 02:30:01  rbowen
-  Moved the inline tests into t/ for the sake of making the module more
-  readable. Please don't let this discorage you from writing inline
-  tests.
-
-  Revision 1.29  2001/08/06 19:32:39  rbowen
-  Creating an object without args was calling gmtime( $args{epoch} ).
-  Fixed and added tests. Also added Time::HiRes to PREREQ list.
-
-  Revision 1.28  2001/08/06 18:45:47  rbowen
-  sub epoch was referencing another sub that has gone away. Fixed, and
-  added tests.
-
-  Revision 1.27  2001/08/02 04:38:16  srl
-  Adjusted the add() method to return a copy of $self instead of the
-  return value of $self->jd(). This was important to making
-  the Net::ICal tests pass, but it's also the Right Way, I think.
-
-  Revision 1.26  2001/08/02 03:47:59  rbowen
-  Handle negative durations correctly.
-
-  Revision 1.25  2001/08/01 02:19:03  rbowen
-  Two main changes here.
-  1) Split the internal date/time representation into date, time
-  integers, so that we don't have any more roundoff error.
-  2) Memoized the parsetime and parsedate methods, so that we're not
-  doing that three times every time we want three components, which we
-  were doing.
-
 
 =cut
 

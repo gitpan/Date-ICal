@@ -1,6 +1,9 @@
 NAME
     Date::ICal - Perl extension for ICalendar date objects.
 
+VERSION
+    $Revision: 1.2 $
+
 SYNOPSIS
         use Date::ICal;
 
@@ -23,6 +26,11 @@ DESCRIPTION
 
     See http://dates.rcbowen.com/unified.txt for details
 
+AUTHOR
+    Rich Bowen, and the Reefknot team (www.reefknot)
+
+    Last touched by $Author: rbowen $
+
 METHODS
     Date::ICal has the following methods available:
 
@@ -31,6 +39,7 @@ METHODS
     A new Date::ICal object can be created with any valid ICal string:
 
         my $ical = Date::ICal->new( ical => '19971024T120000' );
+        # will default to the timezone specified in $TZ, see below
 
     Or with any epoch time:
 
@@ -62,12 +71,32 @@ METHODS
        my $iso = Date::ISO->new( $disco );
        print $iso->iso;
 
+    new() handles timezones. It defaults times to UTC (Greenwich Mean Time,
+    also called Zulu). If you want to set up a time that's in the US
+    "Pacific" timezone, which is GMT-8, use something like:
+
+        my $ical = Date::ICal->new( ical => '19971024T120000',
+                                    offset => "-0800");
+   
+    Note that as of version 1.44, new() tries to be intelligent about
+    figuring out your local time zone. If you enter a time that's not
+    *explicitly* in UTC, it looks at the environment variable $TZ, if it
+    exists, to determine your local offset. If $TZ isn't set, new() will
+    complain.
+
   ical
 
         $ical_string = $ical->ical;
 
     Retrieves, or sets, the date on the object, using any valid ICal
-    date/time string.
+    date/time string. Output is in UTC (ends with a "Z") by default. To get
+    output in localtime relative to the current machine, do:
+
+        $ical_string = $ical->ical( localtime => 1 );
+
+    To get output relative to an arbitrary offset, do:
+
+        $ical_string = $ical->ical( offset => '+0545' );
 
   epoch
 
@@ -86,11 +115,26 @@ METHODS
     may not be in synch. And, of course, the same will go for any subclasses
     of this class.
 
+  _offset_to_seconds
+
+        $seconds_plus_or_minus = offset_to_seconds($offset);
+   
+    Changes -0600 to -18000. Not object method, no side-effects.
+
+  _offset_from_seconds
+
+        $seconds_plus_or_minus = offset_from_seconds($offset_in_seconds);
+   
+    Changes -18000 (seconds) to -0600 (hours, minutes). Not object method,
+    no side-effects.
+
   offset
 
         $offset = $ical->offset;
-    
-        $ical->offset( '+1100' );
+   
+        # We need tests for these.  
+        $ical->offset( '+1100' ); # a number of hours and minutes: UTC+11
+        $ical->offset( 0 );       # reset to UTC
 
     Sets or retrieves the offset from UTC for this time. This allows
     timezone support, assuming you know what your local (or non-local) UTC
@@ -100,22 +144,83 @@ METHODS
     may have some offset information. Offsets are internally stored in
     signed integer seconds.
 
+    BE CAREFUL about using this function on objects that were initialized
+    with an offset. If you started an object with:
+
+        my $d = new(ical=>'19700101120000', offset=>'+0100'); 
+
+    and you then call:
+
+        $d->offset('+0200'); 
+    
+    you'll be saying "Yeah, I know I *said* it was in +0100, but really I
+    want it to be in +0200 now and forever." Which may be your intention, if
+    you're trying to transpose a whole set of dates to another timezone---
+    but you can also do that at the presentation level, with the ical()
+    method. Either way will work.
+
   add
 
-        $date->add( %hash ); # Hash of day, hour, min, etc, values
-        $date->add( ical => $ical_duration_string );
+        $self->add( year => 3, month => 2, week => 1, day => 12,
+                    hour => 1, minute => 34, sec => 59 );
+        $date->add( duration => 'P1WT1H1M1S' ); # add 1 wk, 1 hr, 1 min, and 1 sec
 
     Adds a duration to a Date::ICal object.
 
-    Duration should be passed in as either an ical string, or as a hash of
-    date/time properties.
+    Supported paraters are: duration, eom_mode, year, month, week, day,
+    hour, min, sec or seconds.
+
+    'duration' is a ICalendar duration string (see duration_value).
+
+    If a value is undefined or omitted, 1 is assumed:
+
+        $ical->add( 'minute' ); # add a minute
 
     The result will be normalized. That is, the output time will have
     meaningful values, rather than being 48:73 pm on the 34th of
     hexadecember.
 
-       $self->add( month=>2 );
-       $self->add( duration =>'P1W' );
+    Adding months or years can be done via three different methods,
+    specified by the eom_mode parameter, which then applies to all additions
+    (or subtractions) of months or years following it in the parameter list.
+
+    The default, eom_mode => 'wrap', means adding months or years that
+    result in days beyond the end of the new month will roll over into the
+    following month. For instance, adding one year to Feb 29 will result in
+    Mar 1.
+
+    If you specify eom_mode => 'limit', the end of the month is never
+    crossed. Thus, adding one year to Feb 29, 2000 will result in Feb 28,
+    2001. However, adding three more years will result in Feb 28, 2004, not
+    Feb 29.
+
+    If you specify eom_mode => 'preserve', the same calculation is done as
+    for 'limit' except that if the original date is at the end of the month
+    the new date will also be. For instance, adding one month to Feb 29,
+    2000 will result in Mar 31, 2000.
+
+    All additions are performed in the order specified. For instance, with
+    the default setting of eom_mode => 'wrap', adding one day and one month
+    to Feb 29 will result in Apr 1, while adding one month and one day will
+    result in Mar 30.
+
+  duration_value
+
+    Given a duration string, this function returns the number of days,
+    seconds, and months represented by that duration. In that order. Seems
+    odd to me. This should be considered an internal function, and you
+    should expect the API to change in the very near future.
+
+  subtract
+
+      $duration = $date1 - $date2;
+
+    Simple date subtraction. Returns a hashref containing duration
+    components D (days) H (hours) M (mins) S (seconds) and 'duration' (a
+    duration string).
+
+    WARNING. This API is just a suggestion, and may not end up being the
+    final API. Don't rely on it too seriously.
 
   compare
 
@@ -148,6 +253,30 @@ METHODS
 
     Returns the year.
 
+  jd2greg
+
+        ($year, $month, $day) = jd2greg( $jd );
+
+        Convert number of days on or after Jan 1, 1 CE (Gregorian) to
+        gregorian year,month,day.
+
+  greg2jd
+
+        $jd = greg2jd( $year, $month, $day );
+
+        Convert gregorian year,month,day to days on or after Jan 1, 1 CE
+        (Gregorian).  Normalization is performed (e.g. month of 28 means
+        April two years after given year) for month < 1 or > 12 or day < 1
+        or > last day of month.
+
+  days_this_year
+
+      $yday = Date::ICal::days_this_year($day, $month, $year);
+
+    Returns the number of days so far this year. Analogous to the yday
+    attribute of gmtime (or localtime) except that it works outside of the
+    epoch.
+
 hour
         my $hour = $date->hour
 
@@ -178,23 +307,22 @@ julian
     thought of as a real julian day, because it's not. The module is
     internally consistent, and that's enough.
 
-    This really should be considered an internal method.
+    This method really only is here for compatibility with previous
+    versions, as the jd method is now thrown over for plain hash references.
 
     See the file INTERNALS for more information about this internal format.
 
 TODO
-    - add timezone support, including moving between timezones
     - add gmtime and localtime methods, perhaps?
-    - Find a solution to the 1-second round-off errors. Perhaps move to two
-    values (date and time) rather than one single value. This change can be
-    made internally without affecting anything outside.
+    - Fix the INTERNALS file so that it actually reflects reality
 INTERNALS
         Please see the file INTERNALS for discussion on the internals.
 
 AUTHOR
         Rich Bowen (DrBacchus) rbowen@rcbowen.com
 
-        And the rest of the Reefknot team.
+        And the rest of the Reefknot team. See the source for a full list of
+        patch contributors and version-by-version notes.
 
 SEE ALSO
         datetime@perl.org mailing list
@@ -206,57 +334,4 @@ SEE ALSO
         Time::Local
 
         Net::ICal
-
-        # CVS History #{{{
-
-CVS History
-          $Log: README,v $
-          Revision 1.1  2001/10/15 01:56:25  rbowen
-          coral says README is prefered to Readme, wrt CPAN. I had no opinions
-          either way, so here it is.
-
-          Revision 1.34  2001/09/12 03:26:23  rbowen
-          There's no particular reason to have Date::ICal be 5.6 dependant.
-
-          Revision 1.33  2001/08/25 12:20:30  rbowen
-          Fixed bug reported by Chris Jones. In sub add, I was checking one
-          attribute and using another. Added tests for this bug, and for adding
-          durations by attribute.
-
-          Revision 1.32  2001/08/10 03:27:47  srl
-          Started adding timezone support by making an offset() method and an offset
-          property. This still needs to be wired into the new() method and the
-          output methods, but we have to resolve some interface details first.
-
-          Revision 1.31  2001/08/07 02:41:11  rbowen
-          Test::More gets angry if there are no tests.
-
-          Revision 1.30  2001/08/07 02:30:01  rbowen
-          Moved the inline tests into t/ for the sake of making the module more
-          readable. Please don't let this discorage you from writing inline
-          tests.
-
-          Revision 1.29  2001/08/06 19:32:39  rbowen
-          Creating an object without args was calling gmtime( $args{epoch} ).
-          Fixed and added tests. Also added Time::HiRes to PREREQ list.
-
-          Revision 1.28  2001/08/06 18:45:47  rbowen
-          sub epoch was referencing another sub that has gone away. Fixed, and
-          added tests.
-
-          Revision 1.27  2001/08/02 04:38:16  srl
-          Adjusted the add() method to return a copy of $self instead of the
-          return value of $self->jd(). This was important to making
-          the Net::ICal tests pass, but it's also the Right Way, I think.
-
-          Revision 1.26  2001/08/02 03:47:59  rbowen
-          Handle negative durations correctly.
-
-          Revision 1.25  2001/08/01 02:19:03  rbowen
-          Two main changes here.
-          1) Split the internal date/time representation into date, time
-          integers, so that we don't have any more roundoff error.
-          2) Memoized the parsetime and parsedate methods, so that we're not
-          doing that three times every time we want three components, which we
-          were doing.
 
