@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = (qw'$Revision: 1.25 $')[1];
+$VERSION = (qw'$Revision: 1.27 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -369,6 +369,15 @@ $t = Date::ICal->new (ical => '19860128T163800Z');
 $t->add(duration => 'P3DT2H20M15S');
 ok ($t->ical eq '19860131T185815Z', "Adding durations with days, hours, minutes, and seconds works");
 
+# Add 15M - this test failing in N::I::Time
+$t = Date::ICal->new( ical =>  '20010405T160000Z');
+$t->add( duration => 'PT15M' );
+ok( $t->ical eq '20010405T161500Z', "Adding minutes to an ical string");
+
+# Subtract a duration
+$t->add( duration => '-PT15M' );
+ok( $t->ical eq '20010405T160000Z', "Back where we started");
+
 =end testing
 
 #}}}
@@ -408,6 +417,8 @@ sub add {
     $seconds = $seconds - ( $days * 86400 );
 
     $self->jd( [$jd->[0] + $days, $jd->[1] + $seconds ] );
+
+    return $self;
 }
 #}}}
 
@@ -438,8 +449,9 @@ sub duration_as_sec {
         return undef;
     }
     $sign = ( ( defined($sign) && $sign eq '-' ) ? -1 : 1 );
-    return $sign * $secs + ( $mins * 60 ) + ( $hours * 3600 ) +
-      ( $days * 86400 ) + ( $weeks * 604800 );
+
+    return $sign * ( $secs + ( $mins * 60 ) + ( $hours * 3600 ) +
+      ( $days * 86400 ) + ( $weeks * 604800 ) );
 }
 
 #}}}
@@ -856,6 +868,14 @@ Net::ICal
 =head1 CVS History
 
   $Log: ICal.pm,v $
+  Revision 1.27  2001/08/02 04:38:16  srl
+  Adjusted the add() method to return a copy of $self instead of the
+  return value of $self->jd(). This was important to making
+  the Net::ICal tests pass, but it's also the Right Way, I think.
+
+  Revision 1.26  2001/08/02 03:47:59  rbowen
+  Handle negative durations correctly.
+
   Revision 1.25  2001/08/01 02:19:03  rbowen
   Two main changes here.
   1) Split the internal date/time representation into date, time
