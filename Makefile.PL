@@ -1,22 +1,5 @@
 use ExtUtils::MakeMaker;
 
-print 
-"-------------------------------------------------------------------
-Thanks for your interest in Date::ICal. You should know that this
-is an ALPHA RELEASE. That means that some tests *will fail*. We
-know this, and in some cases the failing tests are intentional.
-If you want to help us out, please make the tests pass, or 
-write tests for existing code, and send the patches to our
-developers' mailing list. See the README for more information.
-
-- The Reefknot team (http://reefknot.sf.net)
--------------------------------------------------------------------
-";
-
-
-
-# See lib/ExtUtils/MakeMaker.pm for details of how to influence
-# the contents of the Makefile that is written.
 WriteMakefile(
     'NAME'		=> 'Date::ICal',
     'VERSION_FROM'	=> 'ICal.pm', # finds $VERSION
@@ -26,6 +9,7 @@ WriteMakefile(
         Date::Leapyear => '1.03',
         Time::Local => 0,
         Memoize     => 0,
+        Time::HiRes => 0,
         Storable    => 0,
     }, # e.g., Module::Name => 1.1
 );

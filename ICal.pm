@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = (qw'$Revision: 1.27 $')[1];
+$VERSION = (qw'$Revision: 1.28 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -237,17 +237,15 @@ ok($epochtest->sec() == '0', "Epoch 0 has second 0 defined");
 
 sub epoch {
     my $self = shift;
+    my $class = ref($self);
+
     my $epoch;
 
     if ( $epoch = shift ) {    # Passed in a new value
 
-        my ( $sec, $min, $hour, $day, $month, $year ) = gmtime($epoch);
-        $year += 1900;
-        $month++;
+        my $newepoch = $class->new( epoch => $epoch );
+        $self->{jd} = $newepoch->jd;
 
-        $self->julian( leapdays_before($year) +
-          days_this_year( $day,   $month, $year ) +
-          fractional_time( $hour, $min,   $sec ) + $year * 365 );
     }
 
     else {    # Calculate epoch from components, if possible
@@ -259,6 +257,17 @@ sub epoch {
 
     return $epoch;
 }
+
+=begin testing
+
+$epochtest = Date::ICal->new(epoch => '997122970');
+ok ( $epochtest->epoch( 997121000 ) == 997121000,
+    "Setting epoch returns correct value");
+ok( $epochtest->epoch == 997121000, "And the value stuck" );
+ok( $epochtest->hour == 18, "Hour, after setting epoch" );
+ok( $epochtest->min == 3, "Min, after setting epoch" );
+
+=end testing
 
 #}}}
 
@@ -868,6 +877,10 @@ Net::ICal
 =head1 CVS History
 
   $Log: ICal.pm,v $
+  Revision 1.28  2001/08/06 18:45:47  rbowen
+  sub epoch was referencing another sub that has gone away. Fixed, and
+  added tests.
+
   Revision 1.27  2001/08/02 04:38:16  srl
   Adjusted the add() method to return a copy of $self instead of the
   return value of $self->jd(). This was important to making
