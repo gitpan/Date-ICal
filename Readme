@@ -1,23 +1,20 @@
 NAME
-    Date::ICal - Perl extension for ICal date objects.
+    Date::ICal - Perl extension for ICalendar date objects.
 
-WARNING
-
-    THIS VERSION IS BORKED. THIS IS A DEVELOPMENT RELEASE ONLY.
-    
 SYNOPSIS
         use Date::ICal;
 
         $ical = Date::ICal->new( ical => '19971024T120000' );
         $ical = Date::ICal->new( epoch => time );
+        $ical = Date::ICal->new( year => 1964,
+            month => 10, day => 16, hour => 16,
+            min => 12, sec => 47, tz => '0530' );
 
         $hour = $ical->hour;
         $year = $ical->year;
 
         $ical_string = $ical->ical;
         $epoch_time = $ical->epoch;
-
-        $ical->epoch( time+60 ); # Set the time a minute ahead
 
 DESCRIPTION
     Date::ICal talks the ICal date format, and is intended to be a base
@@ -38,6 +35,17 @@ METHODS
     Or with any epoch time:
 
         my $ical = Date::ICal->new( epoch => time );
+
+    Or, better still, create it with components
+
+        my $date = Date::ICal->new( 
+                               day => 25, 
+                               month => 10, 
+                               year => 1066,
+                               hour => 7,
+                               min => 15,
+                               sec => 47
+                               );
 
     If you call new without any arguments, you'll get a Date::ICal object
     that is set to the time right now.
@@ -75,28 +83,6 @@ METHODS
     may not be in synch. And, of course, the same will go for any subclasses
     of this class.
 
-  _parse_ical
-
-        $self->_parse_ical;
-
-    "_parse_ical" is an internal method (although I suppose you could call
-    it externally if you really wanted to) which repopulates other
-    attributes based on the ical field. This should be called by various
-    methods if an attribute is undefined.
-
-  _format_ical
-
-        $self->_format_ical;
-
-    This is an internal method used to rebuild the ical string when one
-    component, such as the "second" or "month" field has been changed.
-
-  _epoch_from_ical
-
-        $self->_epoch_from_ical;
-
-    This is an internal method used to determine the epoch time from the
-    ical value.
 
   add
 
@@ -115,33 +101,6 @@ METHODS
        $self->add( month=>2 );
        $self->add( duration =>'P1W' );
 
-  _normal
-
-      $self->_normal($attrib,$suggestednewvalue);
-
-      This attempts to flatten out of range values to what they should be and adjust
-    adjcent values accordingly.  For instance passing 'month' and 14 to _normal
-    would result in the year being incremented and the ical month field being set
-    to two
-
-  _month_length
-
-      $self->_month_length();
-
-      This utility returns the length of the current ical month.
-
-  _alter_period
-
-      $self->_alter_period($attrib);
-
-    called by add and _normal to do the hard work of flattening the values
-
-  add_duration
-
-       $self->add_duration('P2W');
-
-    Adds a rfc2445 duration to current $self->{ical}
-
   compare
 
         $cmp = $date1->compare($date2);
@@ -151,11 +110,62 @@ METHODS
     Compare two Date::ICal objects. Semantics are compatible with sort;
     returns -1 if $a < $b, 0 if $a == $b, 1 if $a > $b.
 
+  day
+
+        my $day = $date->day;
+
+    Returns the day of the month.
+
+    Day is in the range 1..31
+
+  month
+
+        my $month = $date->month;
+
+    Returns the month of the year.
+
+    Month is returned as a number in the range 1..12
+
+  year
+
+        my $year = $date->year;
+
+    Returns the year.
+
+hour
+        my $hour = $date->hour
+
+    Returns the hour of the day.
+
+    Hour is in the range 0..23
+
+min
+        my $min = $date->min;
+
+    Returns the minute.
+
+    Minute is in the range 0..59
+
+sec
+        my $sec = $date->sec;
+
+    Returns the second.
+
+    Second is in the range 0..60. The value of 60 is (maybe) needed for leap
+    seconds. But I'm not sure if we're going to go there.
+
+julian
+      my $jd = $date->jd;
+
+    Returns the "Julian day", with the fractional part representing the time
+    of day as a fraction of the seconds in a day. This should not be thought
+    of as a real julian day, because it's not. The module is internally
+    consistent, and that's enough.
+
+    This really should be considered an internal method.
+
 TODO
-    - IMPORTANT: rework internal storage to Julian dates and times
-    - add support for initializing dates
     - add timezone support, including moving between timezones
-    - add arithmetic methods: add, subtract, ...
     - add gmtime and localtime methods, perhaps?
 AUTHOR
         Rich Bowen (DrBacchus) rbowen@rcbowen.com

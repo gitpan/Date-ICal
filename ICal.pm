@@ -2,7 +2,7 @@ package Date::ICal;
 use strict;
 
 use vars qw($VERSION);
-$VERSION = (qw'$Revision: 1.20 $')[1];
+$VERSION = (qw'$Revision: 1.22 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -112,7 +112,7 @@ sub new {
         ( $year, $month, $day, $hour, $min, $sec, $zflag ) =
           $args{ical} =~ /^(?:(\d{4})(\d\d)(\d\d))
                (?:T(\d\d)?(\d\d)?(\d\d)?)?
-                     (Z)?$/x;
+                       (Z)?$/x;
 
         $zflag = $args{ical} =~ /Z$/;
 
@@ -182,7 +182,7 @@ sub ical {
         my ( $year, $month, $day, $hour, $min, $sec, $zflag ) =
           $ical =~ /^(?:(\d{4})(\d\d)(\d\d))
                (?:T(\d\d)?(\d\d)?(\d\d)?)?
-                     (Z)?$/x;
+                       (Z)?$/x;
 
         $zflag = $ical =~ /Z$/;
 
@@ -312,60 +312,7 @@ ok( $postepoch->hour == 04, "Post-epoch hour");
 
 =cut
 
-#{{{ sub _parse_ical
-sub _parse_ical {
-    my $self = shift;
-
-    $self->{ical} =~ s/^(?:(?:DTSTAMP|DTSTART|DTEND)[:;])//;
-    my $ical = $self->{ical};
-
-    # grab the timezone, if any
-    $ical =~ s/^(?:TZID=([^:]+):)?//;
-    my $tz = $1;
-
-    my ( $year, $month, $day, $hour, $minute, $second, $zflag ) =
-      $ical =~ /^(?:(\d{4})(\d\d)(\d\d))
-           (?:T(\d\d)?(\d\d)?(\d\d)?)?
-                 (Z)?$/x;
-
-    $zflag = $ical =~ /Z$/;
-
-    # DEBUGGING:
-    # print "$year $month $day $hour $minute $second $zflag\n";
-    unless ( defined($year) ) {
-        carp "Invalid DATE-TIME format ($ical)";
-        return undef;
-    }
-
-    if ( defined($tz) || defined($zflag) ) {
-        $self->{floating} = 0;
-      } else {
-        $self->{floating} = 1;
-    }
-
-    if ( defined($zflag) && ($tz) ) {
-        carp "Invalid DATE-TIME format -- may not include both Z and timezone";
-        return undef;
-    }
-
-    $self->{timezone} = defined($zflag) ? 'UTC' : $tz;
-
-    $self->{year}  = $year;
-    $self->{month} = $month;
-    $self->{day}   = $day;
-
-    $self->{hour}   = $hour || 0;
-    $self->{minute} = $minute || 0;
-    $self->{second} = $second || 0;
-
-    #$self->{epoch} = $self->_epoch_from_ical;
-
-    # TODO: this doesn't set the epoch time properly.
-}
-
-#}}}
-
-=head2 add#{{{
+=head2 add
 
     $date->add( %hash ); # Hash of day, hour, min, etc, values
     $date->add( ical => $ical_duration_string );
@@ -382,44 +329,39 @@ hexadecember.
    $self->add( month=>2 );
    $self->add( duration =>'P1W' );
 
+Pod::Tests testing #{{{
+
 =begin testing
 
 my $t = Date::ICal->new( ical => '19961122T183020' );
 $t->add( week => 8);
 
-#test 1 check year rollover works
 ok($t->year == 1997, "year rollover");
-#test 2 check month set on year rollover
 ok($t->month == 1, "month set on year rollover");
 
 $t->add( week => 2 );
 
 # Now, test the adding of durations
-
 $t = Date::ICal->new (ical => '19860128T163800Z');
 
 $t->add(duration => 'PT1M12S');
-print $t->ical . "\n";
 ok ($t->ical eq '19860128T163912Z', "Adding durations with minutes and seconds works");
 
 $t = Date::ICal->new (ical => '19860128T163800Z');
 
 $t->add(duration => 'PT30S');
-print $t->ical . "\n";
 ok ($t->ical eq '19860128T163829Z', "Adding durations with seconds only works");
 # XXX Round-off error
 
 $t = Date::ICal->new (ical => '19860128T163800Z');
 
 $t->add(duration => 'PT1H10M');
-print $t->ical . "\n";
 ok ($t->ical eq '19860128T174800Z', "Adding durations with hours and minutes works");
 
 
 $t = Date::ICal->new (ical => '19860128T163800Z');
 
 $t->add(duration => 'P3D');
-print $t->ical . "\n";
 # XXX: what's "right" in the following test? should the result
 # just be a date, or a date and time?
 ok ($t->ical eq '19860131T163800Z', "Adding durations with days only works");
@@ -428,22 +370,21 @@ ok ($t->ical eq '19860131T163800Z', "Adding durations with days only works");
 $t = Date::ICal->new (ical => '19860128T163800Z');
 
 $t->add(duration => 'P3DT2H');
-print $t->ical . "\n";
 ok ($t->ical eq '19860131T183800Z', "Adding durations with days and hours works");
 
 
 $t = Date::ICal->new (ical => '19860128T163800Z');
 
 $t->add(duration => 'P3DT2H20M15S');
-print $t->ical . "\n";
 ok ($t->ical eq '19860131T185815Z', "Adding durations with days, hours, minutes, and seconds works");
-
-
 
 =end testing
 
+#}}}
+
 =cut
 
+# sub add #{{{
 sub add {
     my $self = shift;
     my %args = @_;
@@ -460,106 +401,18 @@ sub add {
       } else {
 
         my $seconds;
-        $seconds += $args{sec} if defined $args{secs};
-        $seconds += $args{min} * 60 if defined $args{min};
-        $seconds += $args{hour} * 60 * 60 if defined $args{hour};
-        $seconds += $args{day} * 60 * 60 * 24 if defined $args{day};
-        $seconds += $args{week} * 7 * 60 * 60 * 24 if defined $args{week};
+        $seconds += $args{sec}                      if defined $args{secs};
+        $seconds += $args{min}  * 60                if defined $args{min};
+        $seconds += $args{hour} * 60 * 60           if defined $args{hour};
+        $seconds += $args{day}  * 60 * 60 * 24      if defined $args{day};
+        $seconds += $args{week} * 7  * 60 * 60 * 24 if defined $args{week};
 
         $self->{jd} += ( $seconds / 86400 );
     }
-
-}    #}}}
-
-=head2 _normal
-
-  $self->_normal($attrib,$suggestednewvalue);
-
-  This attempts to flatten out of range values to what they should be and adjust
-adjcent values accordingly.  For instance passing 'month' and 14 to _normal
-would result in the year being incremented and the ical month field being set
-to two
-
-=cut
-
-sub _normal {
-    my ( $self, $attrib, $newvalue ) = @_;
-    if ( $attrib eq 'week' ) { $newvalue *= 7; $attrib = "day"; }
-    $self->{$attrib} = $newvalue;
-    $self->_alter_period($attrib);
-    $self->{epoch} = $self->_epoch_from_ical;
-    return $self->{$attrib};
 }
+#}}}
 
-=head2 _month_length
-
-  $self->_month_length();
-
-  This utility returns the length of the current ical month.
-
-=cut
-
-sub _month_length {
-    my @months = qw(31 28 31 30 31 30 31 31 30 31 30 31);
-    my $self   = shift;
-    my $m      = $months[ $self->month() - 1 ];
-    $m++
-      if ( $self->{month} == 2
-      && ( ( $self->{year} % 4 ) == 0 && !( $self->{year} / 1000 ) ) );
-    return $m;
-}
-
-#period prop is used by _alter_period
-
-my %period_prop = (
-  'second' => { 'offset' => 0, 'multip'   => 1,    'overflow' => 59 },
-  'minute' => { 'offset' => 1, 'overflow' => 59 },
-  'hour'   => { 'offset' => 2, 'multip'   => 3600, 'overflow' => 23 },
-  'day'   => { 'offset' => 3, 'multip' => 86400, overflow => \&month_length },
-  'month' => { 'offset' => 4, overflow => 12,    fix      => 11 },
-  'year'  => {
-      'offset' => 5,
-      overflow => 2038
-  }
-);
-
-=head2 _alter_period
-
-  $self->_alter_period($attrib);
-
-called by add and _normal to do the hard work of flattening the values
-
-=cut
-
-sub _alter_period {
-    my ( $self, $attrib ) = @_;
-
-    my $overflow = $period_prop{$attrib}->{overflow};
-    $overflow = $self->_month_length() if ( $attrib eq 'day' );
-
-    my $month_sign = $self->{month} > 0 ? 0 : -1;
-    $self->{year} =
-      $self->{year} + ( int( $self->{month} / 12 ) + $month_sign );
-    $self->{month} = ( ( $self->{month} - 1 ) % 12 ) + 1;
-
-    if ( $self->{$attrib} > $overflow || $self->{$attrib} < 1 ) {
-        my $overflow = $period_prop{$attrib}->{fix} || $overflow;
-        my @norm =
-          ( $self->{second}, $self->{minute}, $self->{hour}, $self->{day},
-          $self->{month} - 1, $self->{year} - 1900 );
-        $norm[ $period_prop{$attrib}->{offset} ] =
-          $self->{$attrib} > 0 ? $overflow : 1;
-        my $tempgm = timegm(@norm);
-
-        if ( exists( $period_prop{$attrib}->{multip} ) ) {
-            $tempgm +=
-              ( $self->{$attrib} - $norm[ $period_prop{$attrib}->{offset} ] ) *
-              $period_prop{$attrib}->{multip};
-        }
-        $self->epoch($tempgm);
-    }
-    return $self->{$attrib};
-}
+# sub duration_as_sec #{{{
 
 sub duration_as_sec {
     my $str = shift;
@@ -576,7 +429,7 @@ sub duration_as_sec {
                 (?:(\d+)M)? (?# Minutes)
                 (?:(\d+)S)? (?# Seconds)
             )?
-            }x;
+              }x;
     my ( $sign, $magic ) = @temp[ 0 .. 1 ];
     my ( $weeks, $days, $hours, $mins, $secs ) =
       map { defined($_) ? $_ : 0 } @temp[ 2 .. $#temp ];
@@ -586,8 +439,8 @@ sub duration_as_sec {
         return undef;
     }
     $sign = ( ( defined($sign) && $sign eq '-' ) ? -1 : 1 );
-    return $sign * $secs + ( $mins * 60 ) + ( $hours * 3600 )
-        + ( $days * 86400 ) + ( $weeks * 604800 );
+    return $sign * $secs + ( $mins * 60 ) + ( $hours * 3600 ) +
+      ( $days * 86400 ) + ( $weeks * 604800 );
 }
 
 #}}}
@@ -602,9 +455,9 @@ Adds a rfc2445 duration to current $self->{ical}
 
 sub add_duration {
     my $self = shift;
-    my $dur = shift;
+    my $dur  = shift;
 
-    $self->{jd} += ( duration_as_sec($dur) / (24*60*60) );
+    $self->{jd} += ( duration_as_sec($dur) / ( 24 * 60 * 60 ) );
 }
 
 =head2 compare
@@ -615,6 +468,8 @@ sub add_duration {
 
 Compare two Date::ICal objects. Semantics are compatible with
 sort; returns -1 if $a < $b, 0 if $a == $b, 1 if $a > $b. 
+
+# Pod::Tests tests #{{{
 
 =begin testing
 
@@ -668,6 +523,8 @@ ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 year diff');
 
 =end testing
 
+#}}}
+
 =cut
 
 sub compare {
@@ -675,23 +532,13 @@ sub compare {
 
     unless ( defined($otherdate) ) { return undef }
 
-    # here, we walk through units from largest to smallest;
-    # if we find a difference, then it's reflective of the difference
-    # between the units as a whole. 
-    my @units = qw(year month day hour minute second);
-
-    foreach my $unit(@units) {
-        if ( $self->$unit < $otherdate->$unit ) {
-            return -1;
-          } elsif ( $self->$unit > $otherdate->$unit )
-        {
-            return 1;
-        }
-
-        # if they're equal for this unit, fall through to the next smaller unit.
+    if ($self->jd < $otherdate->jd) {
+        return -1;
+    } elsif ($self->jd > $otherdate->jd) {
+        return 1;
     }
 
-    # if we got all this way and haven't yet returned, the units are equal.
+#    # if we got all this way and haven't yet returned, the units are equal.
     return 0;
 }
 
@@ -960,6 +807,9 @@ internally consistent, and that's enough.
 
 This really should be considered an internal method.
 
+See the file INTERNALS for more information about this internal
+format.
+
 =cut
 
 sub jd {
@@ -982,6 +832,14 @@ sub julian { return $_[0]->{jd} }
 =item - add timezone support, including moving between timezones
 
 =item - add gmtime and localtime methods, perhaps?
+
+=item - Find a solution to the 1-second round-off errors. Perhaps move
+to two values (date and time) rather than one single value. This
+change can be made internally without affecting anything outside.
+
+=head1 INTERNALS
+
+Please see the file INTERNALS for discussion on the internals.
 
 =head1 AUTHOR
 

@@ -1,0 +1,59 @@
+Date::ICal internals
+
+Date::ICal stores the date/time value internally as a single value,
+and converts to other formats on demand. The internal format is a
+modified julian date - not the standard usage of the term Modified
+Julian Date (aka MJD), but my own bastardization of this.
+
+The jd value (stored in $self->{jd}) is in the format date.time
+
+The date portion is the number of days since January 1, AD 0. This
+makes two incorrect assumptions. First, that we used the Gregorian
+calendar all the way back to AD 0. Secondly, that there was an AD 0,
+which there was not.
+
+The consequences of this are that dates in the region of the
+Julian->Gregorian transition (different dates in different parts of
+the world) add might give incorrect results. Additionally, dates BC
+are not handled in any predictable way. They might actually work. I'm
+not sure.
+
+The time portion is the time, as a fraction of the time in a day. That
+is, its the time, in seconds since midnight, divided by 86400. This
+results in some roundoff error occasionally. This is clearly not
+optimal, and we need to figure out some way to fix this.
+
+-------------------
+
+Julian Dates.
+
+A Julian date, technically speaking, is the number of days since a
+certain date a long time in the past. It's the number of days since 
+noon 4713 BC January 1. See 
+http://www.faqs.org/faqs/astronomy/faq/part3/section-6.html
+for more details.
+
+What we're using a Julian-Date-ish, but they are technically not
+Julian Dates.
+
+----------------------
+
+Proposed change
+
+It occurred to me that it might be nice to have the date stored as two
+values - one the date, and the other the time (in seconds).
+
+So, instead of $self->{jd} being a scalar, it would be a listref,
+looking like [ $date, $time ].
+
+This change might be in the next version if I can get it working
+without breaking too much.
+
+As with any OO module, PLEASe don't count on the internals staying the
+same from one version to another. I'm still playing with different
+ideas.
+
+
+DrBacchus
+drbacchus@drbacchus.com
+
