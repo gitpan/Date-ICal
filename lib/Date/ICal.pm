@@ -1,9 +1,9 @@
-# $Id: ICal.pm,v 1.67 2001/12/28 02:15:42 rbowen Exp $
+# $Id: ICal.pm,v 1.68 2002/01/21 19:44:35 jesse Exp $
 package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths %add_units);
-$VERSION = (qw'$Revision: 1.67 $')[1];
+$VERSION = (qw'$Revision: 1.68 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -24,7 +24,7 @@ Date::ICal - Perl extension for ICalendar date objects.
 
 =head1 VERSION
 
-$Revision: 1.67 $
+$Revision: 1.68 $
 
 =head1 SYNOPSIS
 
@@ -63,7 +63,7 @@ See http://dates.rcbowen.com/unified.txt for details
 
 Rich Bowen, and the Reefknot team (www.reefknot)
 
-Last touched by $Author: rbowen $
+Last touched by $Author: jesse $
 
 =head1 METHODS
 
@@ -206,7 +206,9 @@ sub new {
     bless $self, $class;
 
     if ( exists( $args{offset} ) ) {
-        if ($zflag) {
+        # We should complain if they're trying to set a non-UTC
+        # offset on a time that's inherently UTC.  -jv
+        if ($zflag && ($args{offset} != 0)) {
             carp "Time had conflicting offset and UTC info. Using UTC"
               unless $ENV{HARNESS_ACTIVE};
           } else {

@@ -2,7 +2,7 @@ NAME
     Date::ICal - Perl extension for ICalendar date objects.
 
 VERSION
-    $Revision: 1.67 $
+    $Revision: 1.68 $
 
 SYNOPSIS
         use Date::ICal;
@@ -39,7 +39,7 @@ DESCRIPTION
 AUTHOR
     Rich Bowen, and the Reefknot team (www.reefknot)
 
-    Last touched by $Author: rbowen $
+    Last touched by $Author: jesse $
 
 METHODS
     Date::ICal has the following methods available:

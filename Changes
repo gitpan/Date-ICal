@@ -1,3 +1,10 @@
+2002-01-21 14:44  jesse
+
+	* lib/Date/ICal.pm (1.68): Date::ICal->new bitched if you were
+	setting an epoch time and had even an offset of "0". That's not
+	useful to anyone. it now explicitly checks to make sure an offset
+	isn't 0 before bitching.
+
 2001-12-27 21:15  rbowen
 
 	* lib/Date/ICal.pm (1.67), t/12add.t (1.1): We are now able to use
