@@ -7,4 +7,10 @@ INTERNALS
 t/00load.t
 t/01sanity.t
 t/02normalize.t
-
+t/03components.t
+t/04epoch.t
+t/05ical.t
+t/06add.t
+t/07compare.t
+t/08offset.t
+t/09greg.t

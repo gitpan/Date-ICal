@@ -2,7 +2,7 @@ package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths);
-$VERSION = (qw'$Revision: 1.54 $')[1];
+$VERSION = (qw'$Revision: 1.55 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -523,24 +523,49 @@ sub add {
         $seconds += $args{min}  * 60       if defined $args{min};
         $seconds += $args{hour} * 60 * 60  if defined $args{hour};
 
-	$days = 0;
+        $days = 0;
         $days += $args{day}       if defined $args{day};
         $days += $args{week} * 7  if defined $args{week};
 
-	if ($args{month}) {
-	    my @months = months($self->year);
-	    my $start = $months[$self->month - 1];
-	    my $end = $self->month + $args{month};
-	    my $add = 0;
-	    if ($end > 12) {
-		$end -= 12;
-		$add = $months[12];
-		@months = months($self->year + 1);
-	    }
-	    $end = $months[$end - 1] + $add;
+        if ($args{month}) {
+            my @months = months($self->year);
+            my $start = $months[$self->month - 1];
+            my $end = $self->month + $args{month};
+            my $add = 0;
+            if ($end > 12) {
+                $end -= 12;
+                $add = $months[12];
+                @months = months($self->year + 1);
+            }
+            $end = $months[$end - 1] + $add;
 
-	    $days += $end - $start;
-	}
+            $days += $end - $start;
+        }
+
+        if ($args{year}) {
+            foreach my $year ($self->year .. $self->year + $args{year} - 1) {
+                my $leap = Date::Leapyear::isleap($year);
+                $days += 365 + $leap;
+            }
+
+            # Remove a day if the year that we started in was leap, but
+            # we started *after* the leap day
+            if (Date::Leapyear::isleap($self->year) &&
+                days_this_year($self->day, $self->month, $self->year) >=
+                60) {
+                $days--;
+            }
+
+            # Add a day is the year we finish in is leap, and we end
+            # *after* the leap day
+            if (Date::Leapyear::isleap($self->year + $args{year}) &&
+                days_this_year($self->day, $self->month, $self->year +
+                $args{year}) >= 60) {
+                $days++;
+            }
+        }
+
+
     }
 
     # ick, we really don't want this.
@@ -991,6 +1016,9 @@ Net::ICal
 =head1 CVS History
 
   $Log: ICal.pm,v $
+  Revision 1.55  2001/11/28 02:00:16  rbowen
+  Able to add n years to a date via the add method. Tests to match.
+
   Revision 1.54  2001/11/24 18:57:37  rbowen
   Oops. I reversed the order of the argument list when I added this
   function back in, thereby breaking all code that was calling it.
