@@ -2,7 +2,7 @@ NAME
     Date::ICal - Perl extension for ICalendar date objects.
 
 VERSION
-    $Revision: 1.66 $
+    $Revision: 1.67 $
 
 SYNOPSIS
         use Date::ICal;
@@ -18,6 +18,16 @@ SYNOPSIS
 
         $ical_string = $ical->ical;
         $epoch_time = $ical->epoch;
+
+        $ical2 = $ical + $duration;
+
+    (Where $duration is either a duration string, like 'P2W3DT7H9M', or a
+    Date::ICal::Duration (qv) object.
+
+        $ical += 'P6DT12H';
+
+        $duration = $ical1 - $ical2;
+        $ical3 = $ical1 - $duration;
 
 DESCRIPTION
     Date::ICal talks the ICal date format, and is intended to be a base
@@ -203,6 +213,18 @@ METHODS
     the default setting of eom_mode => 'wrap', adding one day and one month
     to Feb 29 will result in Apr 1, while adding one month and one day will
     result in Mar 30.
+
+  add_overload
+
+        $date = $date1 + $duration;
+
+    Where $duration is either a duration string, or a Date::ICal::Duration
+    object.
+
+        $date += 'P2DT4H7M';
+
+    Adds a duration to a date object. Returns a new object, or, in the case
+    of +=, modifies the existing object.
 
   duration_value
 

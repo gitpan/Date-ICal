@@ -1,16 +1,17 @@
-# $Id: ICal.pm,v 1.66 2001/12/27 02:25:35 rbowen Exp $
+# $Id: ICal.pm,v 1.67 2001/12/28 02:15:42 rbowen Exp $
 package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths %add_units);
-$VERSION = (qw'$Revision: 1.66 $')[1];
+$VERSION = (qw'$Revision: 1.67 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
 use Date::ICal::Duration;
 use overload '<=>' => 'compare',
              'fallback' => 1,
-             '-' => \&subtract;
+             '-' => \&subtract,
+             '+' => \&add_overload;
 
 $localzone   = $ENV{TZ} || 0;
 $localoffset = _calc_local_offset();
@@ -23,7 +24,7 @@ Date::ICal - Perl extension for ICalendar date objects.
 
 =head1 VERSION
 
-$Revision: 1.66 $
+$Revision: 1.67 $
 
 =head1 SYNOPSIS
 
@@ -40,6 +41,16 @@ $Revision: 1.66 $
 
     $ical_string = $ical->ical;
     $epoch_time = $ical->epoch;
+
+    $ical2 = $ical + $duration;
+
+(Where $duration is either a duration string, like 'P2W3DT7H9M', or a
+Date::ICal::Duration (qv) object.
+
+    $ical += 'P6DT12H';
+
+    $duration = $ical1 - $ical2;
+    $ical3 = $ical1 - $duration;
 
 =head1 DESCRIPTION
 
@@ -632,6 +643,37 @@ sub _add {
 }
 
 #}}}
+
+# sub add_overload {{{
+
+=head2 add_overload
+
+    $date = $date1 + $duration;
+
+Where $duration is either a duration string, or a Date::ICal::Duration
+object.
+
+    $date += 'P2DT4H7M';
+
+Adds a duration to a date object. Returns a new object, or, in the case
+of +=, modifies the existing object.
+
+=cut
+
+sub add_overload {
+    my $one = shift;
+    my $two = shift;
+
+    my $ret = $one->clone;
+
+    if ( ref $two ) {
+        $ret->add( duration => $two->as_ical );
+    } else {
+        $ret->add( duration => $two );
+    }
+
+    return $ret;
+} # }}}
 
 # sub _normalize_seconds {{{
 

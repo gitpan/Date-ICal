@@ -1,3 +1,10 @@
+2001-12-27 21:15  rbowen
+
+	* lib/Date/ICal.pm (1.67), t/12add.t (1.1): We are now able to use
+	+ and += to add durations (either a string or a
+	Date::ICal::Duration object) to a Date::ICal object. Added tests
+	for same.
+
 2001-12-26 21:37  rbowen
 
 	* t/: 09greg.t (1.2), 10subtract.t (1.5): Spacing changes (courtesy
