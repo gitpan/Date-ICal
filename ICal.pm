@@ -2,8 +2,9 @@ package Date::ICal;
 use strict;
 
 use vars qw($VERSION);
-$VERSION = (qw'$Revision: 1.11 $')[1];
+$VERSION = (qw'$Revision: 1.14 $')[1];
 use Carp;
+use Time::Local;
 
 =head1 NAME
 
@@ -55,26 +56,30 @@ set to the time right now.
 #{{{ sub new
 sub new {
     my $class = shift;
-    my %args = @_;
+    my %args  = @_;
 
     my $self = \%args;
     bless $self, $class;
 
-    if (defined ($args{epoch}) ) {
+    if ( defined( $args{epoch} ) ) {
         $self->epoch( $args{epoch} );
-    
-    } elsif (defined ($args{ical}) ) {
+
+    }
+    elsif ( defined( $args{ical} ) ) {
+
         # Don't actually need to do anything, except perhaps verify the
         # validity of the argument
-        $self->ical($args{ical} );
+        $self->ical( $args{ical} );
 
-    } else {
-        $self->epoch( time );
-    
+    }
+    else {
+        $self->epoch(time);
+
     }
 
     return $self;
 }
+
 #}}}
 
 =head2 ical
@@ -97,15 +102,17 @@ sub ical {
     my $self = shift;
 
     if ( my $ical = shift ) {
+
         # TODO: shouldn't there be some validation that this is good iCalendar?
         $self->{ical} = $ical;
-        foreach my $attrib (qw(epoch second minute hour day month year)) {
+        foreach my $attrib(qw(epoch second minute hour day month year)) {
             delete $self->{$attrib};
         }
     }
 
     return $self->{ical};
 }
+
 #}}}
 
 =head2 epoch
@@ -128,10 +135,9 @@ And, of course, the same will go for any subclasses of this class.
 
 #{{{ sub epoch
 sub epoch {
-    my ($self, $epoch) = @_;
+    my ( $self, $epoch ) = @_;
 
-
-    if (defined($epoch)) {
+    if ( defined($epoch) ) {
 
         my ( $ss, $mm, $hh, $DD, $MM, $YY ) = gmtime($epoch);
 
@@ -151,6 +157,7 @@ sub epoch {
 
     return $self->{epoch};
 }
+
 #}}}
 
 =head2 Other Accessors
@@ -187,10 +194,13 @@ sub year { attrib( 'year', @_ ); }
 
 sub attrib {
     my $attrib = shift;
-    my $self = shift;
+    my $self   = shift;
 
     if ( my $value = shift ) {
-        $self->{$attrib} = $value;
+
+        # $self->{$attrib} = $value;
+        $self->_parse_ical;
+        $self->_normal( $attrib, $value );
         $self->_format_ical;
     }
 
@@ -200,6 +210,7 @@ sub attrib {
 
     return $self->{$attrib};
 }
+
 #}}}
 
 =head2 _parse_ical
@@ -227,9 +238,8 @@ sub _parse_ical {
     my ( $year, $month, $day, $hour, $minute, $second, $zflag ) =
       $ical =~ /^(?:(\d{4})(\d\d)(\d\d))
            (?:T(\d\d)?(\d\d)?(\d\d)?)?
-           (Z)?$/x;
+               (Z)?$/x;
 
-    print "i see ical $ical \n";
     $zflag = $ical =~ /Z$/;
 
     # DEBUGGING:
@@ -241,7 +251,8 @@ sub _parse_ical {
 
     if ( defined($tz) || defined($zflag) ) {
         $self->{floating} = 0;
-    } else {
+    }
+    else {
         $self->{floating} = 1;
     }
 
@@ -256,16 +267,16 @@ sub _parse_ical {
     $self->{month} = $month;
     $self->{day}   = $day;
 
-    $self->{hour} = $hour || 0;
+    $self->{hour}   = $hour || 0;
     $self->{minute} = $minute || 0;
     $self->{second} = $second || 0;
-    
+
     $self->{epoch} = $self->_epoch_from_ical;
-    
+
     # TODO: this doesn't set the epoch time properly.
 }
-#}}}
 
+#}}}
 
 =head2 _format_ical
 
@@ -280,22 +291,23 @@ such as the C<second> or C<month> field has been changed.
 sub _format_ical {
     my $self = shift;
 
-    if ( $self->{hour} != 0 ) {
+    if ( $self->hour || $self->min || $self->sec ) {
         $self->{ical} =
-          sprintf( '%04d%02d%02dT%02d%02d%02d', $self->{year}, $self->{month},
-          $self->{day}, $self->{hour}, $self->{minute}, $self->{second} );
-    } else {
+          sprintf( '%04d%02d%02dT%02d%02d%02d', $self->year, $self->month,
+          $self->day, $self->hour, $self->minute, $self->second );
+    }
+    else {
         $self->{ical} =
-          sprintf( '%04d%02d%02d', $self->{year}, $self->{month}, $self->{day} );
+          sprintf( '%04d%02d%02d', $self->year, $self->month, $self->day );
     }
 
-    if ($self->{timezone} ) {
+    if ( $self->{timezone} ) {
         my $tz = $self->{timezone};
-        $self->{ical} = ( $tz eq 'UTC' ) ? 
-            $self->{ical}. 'Z' : 
-            "TZID=$tz:" . $self->{ical};
+        $self->{ical} =
+          ( $tz eq 'UTC' ) ? $self->{ical} . 'Z' : "TZID=$tz:" . $self->{ical};
     }
 }
+
 #}}}
 
 =head2 _epoch_from_ical
@@ -309,29 +321,235 @@ This is an internal method used to determine the epoch time from the ical value.
 #{{{ sub _epoch_from_ical
 sub _epoch_from_ical {
     my $self = shift;
-    
-    use Date::Manip;
 
-    my $date_string;
+    my $epoch;
     if ( $self->{hour} != 0 ) {
-        $date_string = sprintf( '%04d%02d%02d%02d%02d%02d', $self->{year}, $self->{month},
-            $self->{day}, $self->{hour}, $self->{minute}, $self->{second} );
+        $epoch = Time::Local::timegm(
+          $self->{second}, $self->{minute}, $self->{hour}, $self->{day},
+          $self->{month},  $self->{year}
+        );
 
-    } else {
-        $date_string = sprintf( '%04d%02d%02d%02d%02d%02d', $self->{year}, $self->{month},
-            $self->{day}, 0 , 0, 0 );
+    }
+    else {
+        $epoch =
+          Time::Local::timegm( 0, 0, 0, $self->{day}, $self->{month} - 1,
+          $self->{year} - 1900 );
     }
 
-    $date_string .= ' GMT' unless $self->{floating};
-
-    # This measures seconds since Jan 1 1970 00:00:00 GMT. If you're not in GMT,
-    # it'll return a not-quite-right date. 
-    my $epoch = &UnixDate($date_string, '%s');
-    
     return $epoch;
 }
+
 #}}}
 
+=head2 add
+
+    $date->add( %hash ); # Hash of day, hour, min, etc, values
+    $date->add( ical => $ical_duration_string );
+
+Adds a duration to a Date::ICal object.
+
+Duration should be passed in as either an ical string, or as a hash of
+date/time properties.
+
+The result will be normalized. That is, the output time will have
+meaningful values, rather than being 48:73 pm on the 34th of 
+hexadecember.
+
+=cut
+
+=head2 add
+
+   $self->add( month=>2 );
+   $self->add( duration =>'P1W' );
+
+=begin testing
+
+
+my $t = Date::ICal->new( ical => '19961122T183020' );
+$t->add( month => 2);
+
+#test 1 check year rollover works
+ok($t->year,1997);
+#test 2 check month set on year rollover
+ok($t->month,1);
+
+$t->add( week => 2 );
+
+#test 3 & 4 check year/month rollover with attrib setting
+$t->month(14);
+ok($t->year,1998);
+ok($t->month,2);
+
+#test 5 & 6 test subtraction with attrib setting
+$t->month(-2);
+ok($t->year,1997);
+ok($t->month,10);
+
+=end testing
+
+=cut
+
+sub add {
+    my ( $self, $attrib, $arg ) = @_;
+    my $pos = $arg > 0 ? "+" : "-";
+    if ( $attrib eq 'week' ) { $arg *= 7; $attrib = "day"; }
+    if ( $attrib eq 'duration' ) { return $self->add_duration($arg); }
+    if ( $attrib =~ /^P/ ) { return $self->add_duration($attrib); }
+    $self->$attrib( $self->$attrib() + $arg );
+    $self->_alter_period($attrib);
+    $self->{epoch} = $self->_epoch_from_ical;
+}
+
+=head2 _normal
+
+  $self->_normal($attrib,$suggestednewvalue);
+
+  This attempts to flatten out of range values to what they should be and adjust
+adjcent values accordingly.  For instance passing 'month' and 14 to _normal
+would result in the year being incremented and the ical month field being set
+to two
+
+=cut
+
+sub _normal {
+    my ( $self, $attrib, $newvalue ) = @_;
+    if ( $attrib eq 'week' ) { $newvalue *= 7; $attrib = "day"; }
+    $self->{$attrib} = $newvalue;
+    $self->_alter_period($attrib);
+    $self->{epoch} = $self->_epoch_from_ical;
+    return $self->{$attrib};
+}
+
+=head2
+
+  $self->_month_length();
+
+  This utility returns the length of the current ical month.
+
+=cut
+
+sub _month_length {
+    my @months = qw(31 28 31 30 31 30 31 31 30 31 30 31);
+    my $self   = shift;
+    my $m      = $months[ $self->month() - 1 ];
+    $m++
+      if ( $self->{month} == 2
+      && ( ( $self->{year} % 4 ) == 0 && !( $self->{year} / 1000 ) ) );
+    return $m;
+}
+
+#period prop is used by _alter_period
+
+my %period_prop = (
+  'second' => { 'offset' => 0, 'multip'   => 1,    'overflow' => 59 },
+  'minute' => { 'offset' => 1, 'overflow' => 59 },
+  'hour'   => { 'offset' => 2, 'multip'   => 3600, 'overflow' => 23 },
+  'day'   => { 'offset' => 3, 'multip' => 86400, overflow => \&month_length },
+  'month' => { 'offset' => 4, overflow => 12,    fix      => 11 },
+  'year'  => {
+      'offset' => 5,
+      overflow => 2038
+  }
+);
+
+=head _alter_period
+
+  $self->_alter_period($attrib);
+
+called by add and _normal to do the hard work of flattening the values
+
+=cut
+
+sub _alter_period {
+    my ( $self, $attrib ) = @_;
+
+    my $overflow = $period_prop{$attrib}->{overflow};
+    $overflow = $self->_month_length() if ( $attrib eq 'day' );
+
+    my $month_sign = $self->{month} > 0 ? 0 : -1;
+    $self->{year} =
+      $self->{year} + ( int( $self->{month} / 12 ) + $month_sign );
+    $self->{month} = ( ( $self->{month} - 1 ) % 12 ) + 1;
+
+    if ( $self->{$attrib} > $overflow || $self->{$attrib} < 1 ) {
+        my $overflow = $period_prop{$attrib}->{fix} || $overflow;
+        my @norm =
+          ( $self->{second}, $self->{minute}, $self->{hour}, $self->{day},
+          $self->{month} - 1, $self->{year} - 1900 );
+        $norm[ $period_prop{$attrib}->{offset} ] =
+          $self->{$attrib} > 0 ? $overflow : 1;
+        my $tempgm = timegm(@norm);
+
+        if ( exists( $period_prop{$attrib}->{multip} ) ) {
+            $tempgm +=
+              ( $self->{$attrib} - $norm[ $period_prop{$attrib}->{offset} ] ) *
+              $period_prop{$attrib}->{multip};
+        }
+        $self->epoch($tempgm);
+    }
+    return $self->{$attrib};
+}
+
+sub _duration_as_sec {
+
+    #from old Net::ICal::Duration
+    my ( $self, $str ) = @_;
+    my @temp = $str =~ m{
+            ([\+\-])?   (?# Sign)
+            (P)     (?# 'P' for period? This is our magic character)
+            (?:
+                (?:(\d+)W)? (?# Weeks)
+                (?:(\d+)D)? (?# Days)
+            )?
+            (?:T        (?# Time prefix)
+                (?:(\d+)H)? (?# Hours)
+                (?:(\d+)M)? (?# Minutes)
+                (?:(\d+)S)? (?# Seconds)
+            )?
+          }x;
+    my ( $sign, $magic ) = @temp[ 0 .. 1 ];
+    my ( $weeks, $days, $hours, $mins, $secs ) =
+      map { defined($_) || 0 } @temp[ 2 .. $#temp ];
+
+    if ( !defined($magic) ) {
+        carp "Invalid duration: $str";
+        return undef;
+    }
+    $sign = ( ( defined($sign) && $sign eq '-' ) ? -1 : 1 );
+    return $sign * ( $mins * 60 ) + ( $hours * 3600 ) + ( $days * 86400 ) +
+      ( $weeks * 604800 );
+}
+
+#}}}
+
+=head2 add_duration
+
+   $self->add_duration('P2W');
+
+Adds a rfc2445 duration to current $self->{ical}
+
+=cut
+
+sub add_duration {
+    my ( $self, $addon ) = @_;
+    $self->epoch( $self->_epoch_from_ical + $self->_duration_as_sec($addon) );
+    $self->{epoch} = $self->_epoch_from_ical;
+}
+
+=head2 compare
+
+    $cmp = $date2 Date::ICal::compare $date2;
+
+    @dates = sort {$a Date::ICal::compare $b} @dates;
+
+Compare two Date::ICal objects. Symantics should be compatible with
+sort.
+
+=cut
+
+sub compare {
+
+}
 
 1;
 
@@ -359,5 +577,8 @@ http://reefknot.org/
 
 http://dates.rcbowen.com/
 
-=cut
+Time::Local
 
+Net::ICal
+
+=cut
