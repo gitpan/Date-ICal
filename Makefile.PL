@@ -25,6 +25,8 @@ WriteMakefile(
         Pod::Tests => 0,
         Date::Leapyear => '1.03',
         Time::Local => 0,
+        Memoize     => 0,
+        Storable    => 0,
     }, # e.g., Module::Name => 1.1
 );
 

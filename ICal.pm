@@ -1,11 +1,13 @@
 package Date::ICal;
 use strict;
+use warnings;
 
 use vars qw($VERSION);
-$VERSION = (qw'$Revision: 1.23 $')[1];
+$VERSION = (qw'$Revision: 1.25 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
+use Memoize;
 
 =head1 NAME
 
@@ -64,6 +66,16 @@ set to the time right now.
 
     my $ical = Date::ICal->new();
 
+If you already have an object in Date::ICal, or some other subclass
+thereof, you can create a new Date::ICal (or subclass) object using
+that object to start with. This is particularly useful for converting
+from one calendar to another:
+
+   # Direct conversion from Discordian to ISO dates
+   my $disco = Date::Discordian->new( disco => '12 Chaos, YOLD 3177' );
+   my $iso = Date::ISO->new( $disco );
+   print $iso->iso;
+
 =begin testing
 
 use lib '../blib/lib';
@@ -74,10 +86,8 @@ ok ($t1->epoch() eq '0', 'creation test from epoch (compare to epoch)');
 ok ($t1->ical() eq '19700101Z', 'creation test from epoch (compare to ical)');
 
 $t1 = Date::ICal->new(epoch => '3600');
-ok ($t1->epoch == 3599, 'creation test from epoch = 3600 (compare to epoch)');
-# XXX ROUND-OFF ERROR. FIXME
-ok ($t1->ical eq '19700101T005959Z', 'creation test from epoch (compare to ical = 19700101T010000Z)');
-# XXX ROUND-OFF ERROR. FIXME
+ok ($t1->epoch == 3600, 'creation test from epoch = 3600 (compare to epoch)');
+ok ($t1->ical eq '19700101T010000Z', 'creation test from epoch (compare to ical = 19700101T010000Z)');
 
 
 =end testing
@@ -88,8 +98,14 @@ ok ($t1->ical eq '19700101T005959Z', 'creation test from epoch (compare to ical 
 
 sub new {
     my $class = shift;
-    my %args = @_;
-    my ( $sec, $min, $hour, $day, $month, $year, $tz, $zflag );
+    my ( %args, $sec, $min, $hour, $day, $month, $year, $tz, $zflag );
+
+    # First argument can be a Date::ICal (or subclass thereof) object
+    if ( ref $_[0] ) {
+        $args{ical} = $_[0]->ical;
+    } else {
+        %args = @_;
+    }
 
     # Date is specified as epoch#{{{
     if ( defined( $args{epoch} ) ) {
@@ -144,9 +160,10 @@ sub new {
         $month++;
     }    #}}}
 
-    my $jd =
-      leapdays_before($year) + days_this_year( $day, $month, $year ) +
-      fractional_time( $hour, $min, $sec ) + $year * 365;
+    my $jd = 
+      [ leapdays_before($year) + days_this_year( $day, $month, $year )
+        + $year * 365 ,
+      time_as_seconds( $hour, $min, $sec ) ];
 
     my $self = { jd => $jd };
 
@@ -160,53 +177,25 @@ sub new {
 
     $ical_string = $ical->ical;
 
-    $ical->ical( '19981016' );
-
 Retrieves, or sets, the date on the object, using any valid ICal date/time
 string.
-
-The ICal representation is the one authoritative value in the object, and so
-if it is changed, it must be able to indicate that the other values are no
-longer valid. Or set the correctly. Or something. Comments welcomed.
 
 =cut
 
 #{{{ sub ical
+
 sub ical {
     my $self = shift;
     my $ical;
 
-    # If they passed in an ical string
-    if ( $ical = shift ) {
-
-        # Timezone, if any
-        $ical =~ s/^(?:TZID=([^:]+):)?//;
-        my $tz = $1;
-
-        # Split up ical string
-        my ( $year, $month, $day, $hour, $min, $sec, $zflag ) =
-          $ical =~ /^(?:(\d{4})(\d\d)(\d\d))
-               (?:T(\d\d)?(\d\d)?(\d\d)?)?
-                       (Z)?$/x;
-
-        $zflag = $ical =~ /Z$/;
-
-        $self->julian( leapdays_before($year) +
-          days_this_year( $day,   $month, $year ) +
-          fractional_time( $hour, $min,   $sec ) + $year * 365 );
-
-      } else {    # Calculate it from the internals
-
-        if ( $self->hour || $self->min || $self->sec ) {
-            $ical =
-              sprintf( '%04d%02d%02dT%02d%02d%02dZ', $self->year, $self->month,
-              $self->day, $self->hour, $self->minute, $self->second );
-          } else {
-            $ical =
-              sprintf( '%04d%02d%02dZ', $self->year, $self->month, $self->day );
-        }
+    if ( $self->hour || $self->min || $self->sec ) {
+        $ical =
+          sprintf( '%04d%02d%02dT%02d%02d%02dZ', $self->year, $self->month,
+          $self->day, $self->hour, $self->minute, $self->second );
+    } else {
+        $ical =
+          sprintf( '%04d%02d%02dZ', $self->year, $self->month, $self->day );
     }
-
     return $ical;
 }
 
@@ -279,8 +268,7 @@ sub epoch {
 
 my $acctest = Date::ICal->new(ical => "19920405T160708Z");
 
-ok($acctest->sec == 7, "second accessor read is correct");
-# XXX Yet another round-off error
+ok($acctest->sec == 8, "second accessor read is correct");
 ok($acctest->minute == 7, "minute accessor read is correct");
 ok($acctest->hour == 16, "hour accessor read is correct");
 ok($acctest->day == 5, "day accessor read is correct");
@@ -303,8 +291,7 @@ ok($parsetest->year == 1970, "_parse_ical year is correct on epoch 0");
 my $preepoch = Date::ICal->new( ical => '18700523T164702Z' );
 ok( $preepoch->year == 1870, 'Pre-epoch year' );
 ok( $preepoch->month == 5, 'Pre-epoch month' );
-ok( $preepoch->sec == 1, 'Pre-epoch seconds' );
-# XXX Round-off error
+ok( $preepoch->sec == 2, 'Pre-epoch seconds' );
 
 my $postepoch = Date::ICal->new( ical => '23481016T041612Z' );
 ok( $postepoch->year == 2348, "Post-epoch year" );
@@ -334,9 +321,9 @@ hexadecember.
    $self->add( month=>2 );
    $self->add( duration =>'P1W' );
 
-Pod::Tests testing #{{{
-
 =begin testing
+
+#  Pod::Tests testing #{{{
 
 my $t = Date::ICal->new( ical => '19961122T183020' );
 $t->add( week => 8);
@@ -355,8 +342,7 @@ ok ($t->ical eq '19860128T163912Z', "Adding durations with minutes and seconds w
 $t = Date::ICal->new (ical => '19860128T163800Z');
 
 $t->add(duration => 'PT30S');
-ok ($t->ical eq '19860128T163829Z', "Adding durations with seconds only works");
-# XXX Round-off error
+ok ($t->ical eq '19860128T163830Z', "Adding durations with seconds only works");
 
 $t = Date::ICal->new (ical => '19860128T163800Z');
 
@@ -390,6 +376,7 @@ ok ($t->ical eq '19860131T185815Z', "Adding durations with days, hours, minutes,
 =cut
 
 # sub add #{{{
+
 sub add {
     my $self = shift;
     my %args = @_;
@@ -399,21 +386,28 @@ sub add {
     carp "Date::ICal::add was called without an attribute arg"
       unless ( keys %args );
 
+    my $seconds;
     if ( defined $args{duration} ) {
 
-        $self->add_duration( $args{duration} );
+        $seconds = duration_as_sec( $args{duration} );
 
       } else {
 
-        my $seconds;
+        $seconds =  0;
         $seconds += $args{sec}                      if defined $args{secs};
         $seconds += $args{min}  * 60                if defined $args{min};
         $seconds += $args{hour} * 60 * 60           if defined $args{hour};
         $seconds += $args{day}  * 60 * 60 * 24      if defined $args{day};
         $seconds += $args{week} * 7  * 60 * 60 * 24 if defined $args{week};
-
-        $self->{jd} += ( $seconds / 86400 );
     }
+
+    my $jd = $self->jd;
+
+    # How many days?
+    my $days = int( $seconds/86400 );
+    $seconds = $seconds - ( $days * 86400 );
+
+    $self->jd( [$jd->[0] + $days, $jd->[1] + $seconds ] );
 }
 #}}}
 
@@ -449,21 +443,6 @@ sub duration_as_sec {
 }
 
 #}}}
-
-=head2 add_duration
-
-   $self->add_duration('P2W');
-
-Adds a rfc2445 duration to current $self->{ical}
-
-=cut
-
-sub add_duration {
-    my $self = shift;
-    my $dur  = shift;
-
-    $self->{jd} += ( duration_as_sec($dur) / ( 24 * 60 * 60 ) );
-}
 
 =head2 compare
 
@@ -537,9 +516,17 @@ sub compare {
 
     unless ( defined($otherdate) ) { return undef }
 
-    if ($self->jd < $otherdate->jd) {
+    # One or more days different
+
+    if (($self->jd)->[0] < ($otherdate->jd)->[0]) {
         return -1;
-    } elsif ($self->jd > $otherdate->jd) {
+    } elsif (($self->jd)->[0] > ($otherdate->jd)->[0]) {
+        return 1;
+
+    # They are the same day
+    } elsif ( ($self->jd)->[1] < ($otherdate->jd)->[1]) {
+        return -1;
+    } elsif ( ($self->jd)->[1] > ($otherdate->jd)->[1]) {
         return 1;
     }
 
@@ -605,15 +592,15 @@ sub months {
 
 =begin internal
 
-    fractional_time( $args{hour}, $args{min}, $args{sec} );
+    time_as_seconds( $args{hour}, $args{min}, $args{sec} );
 
-Returns the time of day as a fraction of the lentgh of the day.
+Returns the time of day as the number of seconds in the day.
 
 =end internal
 
 =cut
 
-sub fractional_time {
+sub time_as_seconds {
     my ( $hour, $min, $sec ) = @_;
 
     $hour ||= 0;
@@ -621,7 +608,7 @@ sub fractional_time {
     $sec ||= 0;
 
     my $secs = $hour * 3600 + $min * 60 + $sec;
-    return $secs / 86400;
+    return $secs;
 }
 
 =head2 day
@@ -636,9 +623,7 @@ Day is in the range 1..31
 
 sub day {
     my $self = shift;
-    my $days = int( $self->{jd} );
-
-    return ( parsedays($days) )[0];
+    return ($self->parsedays)[0];
 }
 
 =head2 month
@@ -653,9 +638,7 @@ Month is returned as a number in the range 1..12
 
 sub month {
     my $self = shift;
-    my $days = int( $self->{jd} );
-
-    return ( parsedays($days) )[1];
+    return ($self->parsedays)[1];
 }
 
 sub mon { return month(@_); }
@@ -670,9 +653,7 @@ Returns the year.
 
 sub year {
     my $self = shift;
-    my $days = int( $self->{jd} );
-
-    return ( parsedays($days) )[2];
+    return ($self->parsedays)[2];
 }
 
 =begin internal
@@ -687,6 +668,13 @@ the given date.
 =cut
 
 sub parsedays {
+    my $self = shift;
+    my $day = ($self->jd)->[0];
+    return parsedays_memo( $day );
+}
+
+memoize('parsedays_memo');
+sub parsedays_memo {
     my $day = shift;
 
     # What year are we in?
@@ -728,11 +716,7 @@ Hour is in the range 0..23
 
 sub hour {
     my $self = shift;
-    my $jd   = $self->{jd};
-    my $time = $jd - int($jd);
-    $time *= 86400;
-
-    return ( parsetime($time) )[2];
+    return ($self->parsetime)[2];
 }
 
 =head1 min
@@ -747,11 +731,7 @@ Minute is in the range 0..59
 
 sub min {
     my $self = shift;
-    my $jd   = $self->{jd};
-    my $time = $jd - int($jd);
-    $time *= 86400;
-
-    return ( parsetime($time) )[1];
+    return ( $self->parsetime )[1];
 }
 
 sub minute { return min(@_); }
@@ -769,11 +749,7 @@ leap seconds. But I'm not sure if we're going to go there.
 
 sub sec {
     my $self = shift;
-    my $jd   = $self->{jd};
-    my $time = $jd - int($jd);
-    $time *= 86400;
-
-    return ( parsetime($time) )[0];
+    return ( $self->parsetime )[0];
 }
 
 sub second { return sec(@_); }
@@ -790,6 +766,13 @@ minutes, and hours of the current time.
 =cut
 
 sub parsetime {
+    my $self = shift;
+    my $time = $self->jd->[1];
+    return parsetime_memo( $time );
+}
+
+memoize('parsetime_memo');
+sub parsetime_memo {
     my $time = shift;
 
     my $hour = int( $time / 3600 );
@@ -801,12 +784,14 @@ sub parsetime {
     return ( int($time), $min, $hour );
 }
 
+# sub julian/jd #{{{
+
 =head1 julian
 
   my $jd = $date->jd;
 
-Returns the "Julian day", with the fractional part representing the
-time of day as a fraction of the seconds in a day. This should not 
+Returns a listref, containing two elements. The date as a julian day,
+and the time as the number of seconds since midnight. This should not 
 be thought of as a real julian day, because it's not. The module is
 internally consistent, and that's enough.
 
@@ -827,6 +812,8 @@ sub jd {
     return $self->{jd};
 }
 sub julian { return $_[0]->{jd} }
+
+#}}}
 
 1;
 
@@ -863,6 +850,22 @@ http://dates.rcbowen.com/
 Time::Local
 
 Net::ICal
+
+# CVS History #{{{
+
+=head1 CVS History
+
+  $Log: ICal.pm,v $
+  Revision 1.25  2001/08/01 02:19:03  rbowen
+  Two main changes here.
+  1) Split the internal date/time representation into date, time
+  integers, so that we don't have any more roundoff error.
+  2) Memoized the parsetime and parsedate methods, so that we're not
+  doing that three times every time we want three components, which we
+  were doing.
+
+
+#}}}
 
 =cut
 
