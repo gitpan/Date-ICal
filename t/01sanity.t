@@ -37,7 +37,7 @@ ok( $dec->month == 1, '4 weeks later, it is January' );
 # ACCESSOR READ TESTS
 #====================================================================== 
 
-my $t3 = new Date::ICal( ical => "20010203T183020" );
+my $t3 = new Date::ICal( ical => "20010203T183020Z" );
 
 ok( $t3->year == 2001, "Year accessor" );
 ok( $t3->month == 2,  "Month accessor" );

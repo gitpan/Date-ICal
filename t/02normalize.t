@@ -6,7 +6,7 @@ BEGIN { use_ok( 'Date::ICal' ) }
 
 use Date::ICal;
 
-my $t = Date::ICal->new( ical => '19961122T183020' );
+my $t = Date::ICal->new( ical => '19961122T183020Z' );
 
 # Add 2 months
 # $t->add( month => 2);
@@ -29,15 +29,15 @@ my $t = Date::ICal->new( ical => '19961122T183020' );
 # ok($t->month,10);
 
 $t->add( day => 1 );
-ok($t->day == 23, 'Add one day');
+is($t->day, 23, 'Add one day');
 
 $t->add( week => 1 );
-ok($t->day == 30, 'Add a week' );
+is($t->day, 30, 'Add a week' );
 
 $t->add( hour => 3 );
-ok($t->hour == 21, 'Add 3 hours' );
+is($t->hour, 21, 'Add 3 hours' );
 
 $t->add( day => 15 );
-ok( $t->month == 12, "2 weeks later, it is December" );
-ok( $t->day == 15, "December 15th to be precise" );
+is( $t->month, 12, "2 weeks later, it is December" );
+is( $t->day, 15, "December 15th to be precise" );
 

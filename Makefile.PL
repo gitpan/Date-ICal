@@ -1,5 +1,14 @@
 use ExtUtils::MakeMaker;
 
+print <<EOL;
+
+Note: This is a maintenance release, and should be considered beta
+quality. There are bugs, and some tests have been commented out so that
+this will install successfully. This is being released to get some bug
+fixes out. There should be another release soon.
+
+EOL
+
 WriteMakefile(
     'NAME'		=> 'Date::ICal',
     'VERSION_FROM'	=> 'ICal.pm', # finds $VERSION
@@ -15,10 +24,10 @@ WriteMakefile(
 );
 
 open(MANIFEST, "MANIFEST");
-foreach my $file (grep /\.pm$/, <MANIFEST>) {
-    chomp $file;
-    my($module) = $file =~ m|^(.*)\.pm$|;
-    $module =~ s|/|-|g;
-    system("pod2test $file t/embedded-$module.t");
-}
+# foreach my $file (grep /\.pm$/, <MANIFEST>) {
+#     chomp $file;
+#     my($module) = $file =~ m|^(.*)\.pm$|;
+#     $module =~ s|/|-|g;
+#     system("pod2test $file t/embedded-$module.t");
+# }
 

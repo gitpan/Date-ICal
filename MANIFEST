@@ -1,7 +1,7 @@
 ICal.pm
 MANIFEST
 Makefile.PL
-Readme
+README
 INTERNALS
 
 t/00load.t
