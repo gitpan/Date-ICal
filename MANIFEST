@@ -1,6 +1,7 @@
 ICal.pm
 MANIFEST
 Makefile.PL
+Readme
 
 t/00load.t
 t/01sanity.t

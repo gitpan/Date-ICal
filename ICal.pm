@@ -2,7 +2,7 @@ package Date::ICal;
 use strict;
 
 use vars qw($VERSION);
-$VERSION = (qw'$Revision: 1.15 $')[1];
+$VERSION = (qw'$Revision: 1.18 $')[1];
 use Carp;
 use Time::Local;
 
@@ -107,7 +107,7 @@ sub new {
 Retrieves, or sets, the date on the object, using any valid ICal date/time
 string.
 
-The ICal represenatation is the one authoritative value in the object, and so
+The ICal representation is the one authoritative value in the object, and so
 if it is changed, it must be able to indicate that the other values are no
 longer valid. Or set the correctly. Or something. Comments welcomed.
 
@@ -453,6 +453,12 @@ $epochtest = Date::ICal->new(ical => '19700101');
 ok($epochtest->_epoch_from_ical == '0', 
     "_epoch_from_ical = 0 if ical => 19700101");
 
+ok($preepoch->_epoch_from_ical eq undef, 
+    "Dates before the epoch have no epoch time." );
+
+ok($postepoch->_epoch_from_ical eq undef,
+    "Dates after the epoch have no epoch time." );
+
 =end testing
 
 =cut
@@ -463,6 +469,11 @@ sub _epoch_from_ical {
 
     foreach my $unit (qw(second minute hour day month year)) {
         carp "$unit was not defined" unless defined $self->$unit;
+    }
+
+    if ( ( $self->year < 1970 ) || ( $self->year > 2038 ) ) {
+        carp "There is no epoch value defined for years outside the epoch";
+        return undef;
     }
     
     my $epoch;
@@ -498,15 +509,10 @@ The result will be normalized. That is, the output time will have
 meaningful values, rather than being 48:73 pm on the 34th of 
 hexadecember.
 
-=cut
-
-=head2 add
-
    $self->add( month=>2 );
    $self->add( duration =>'P1W' );
 
 =begin testing
-
 
 my $t = Date::ICal->new( ical => '19961122T183020' );
 $t->add( month => 2);
@@ -527,6 +533,52 @@ ok($t->month == 2, "month rollover with attrib setting");
 $t->month(-2);
 ok($t->year == 1997, "subtraction with attrib setting (year)");
 ok($t->month == 10, "subtraction with attrib setting (month)");
+
+
+# Now, test the adding of durations
+
+$t = Date::ICal->new (ical => '19860128T163800Z');
+
+$t->add(duration => 'PT1M12S');
+print $t->ical . "\n";
+ok ($t->ical eq '19860128T163912Z', "Adding durations with minutes and seconds works");
+
+$t = Date::ICal->new (ical => '19860128T163800Z');
+
+$t->add(duration => 'PT30S');
+print $t->ical . "\n";
+ok ($t->ical eq '19860128T163830Z', "Adding durations with seconds only works");
+
+$t = Date::ICal->new (ical => '19860128T163800Z');
+
+$t->add(duration => 'PT1H10M');
+print $t->ical . "\n";
+ok ($t->ical eq '19860128T174800Z', "Adding durations with hours and minutes works");
+
+
+$t = Date::ICal->new (ical => '19860128T163800Z');
+
+$t->add(duration => 'P3D');
+print $t->ical . "\n";
+# XXX: what's "right" in the following test? should the result
+# just be a date, or a date and time?
+ok ($t->ical eq '19860131T163800Z', "Adding durations with days only works");
+
+
+$t = Date::ICal->new (ical => '19860128T163800Z');
+
+$t->add(duration => 'P3DT2H');
+print $t->ical . "\n";
+ok ($t->ical eq '19860131T183800Z', "Adding durations with days and hours works");
+
+
+$t = Date::ICal->new (ical => '19860128T163800Z');
+
+$t->add(duration => 'P3DT2H20M15S');
+print $t->ical . "\n";
+ok ($t->ical eq '19860131T185815Z', "Adding durations with days, hours, minutes, and seconds works");
+
+
 
 =end testing
 
@@ -660,7 +712,7 @@ sub _duration_as_sec {
     my ( $weeks, $days, $hours, $mins, $secs ) =
       map { defined($_) || 0 } @temp[ 2 .. $#temp ];
 
-    if ( !defined($magic) ) {
+    unless ( defined($magic) ) {
         carp "Invalid duration: $str";
         return undef;
     }
@@ -775,6 +827,8 @@ sub compare {
 
 =over 4 
 
+=item - IMPORTANT: rework internal storage to Julian dates and times
+
 =item - add support for initializing dates 
 
 =item - add timezone support, including moving between timezones
@@ -786,6 +840,8 @@ sub compare {
 =head1 AUTHOR
 
 Rich Bowen (DrBacchus) rbowen@rcbowen.com
+
+And the rest of the Reefknot team.
 
 =head1 SEE ALSO
 
