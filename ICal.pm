@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = (qw'$Revision: 1.31 $')[1];
+$VERSION = (qw'$Revision: 1.33 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -167,6 +167,8 @@ sub new {
 }
 #}}}
 
+#{{{ sub ical
+
 =head2 ical
 
     $ical_string = $ical->ical;
@@ -175,8 +177,6 @@ Retrieves, or sets, the date on the object, using any valid ICal date/time
 string.
 
 =cut
-
-#{{{ sub ical
 
 sub ical {
     my $self = shift;
@@ -195,6 +195,8 @@ sub ical {
 
 #}}}
 
+#{{{ sub epoch
+
 =head2 epoch
 
     $epoch_time = $ical->epoch;
@@ -212,8 +214,6 @@ need to do clever things to keep track of when the two may not be in synch.
 And, of course, the same will go for any subclasses of this class.
 
 =cut
-
-#{{{ sub epoch
 
 sub epoch {
     my $self = shift;
@@ -240,7 +240,78 @@ sub epoch {
 
 #}}}
 
+#{{{ sub offset
+
+
+=head2 offset 
+
+    $offset = $ical->offset;
+    
+    $ical->offset( '+1100' );
+
+Sets or retrieves the offset from UTC for this time. This allows
+timezone support, assuming you know what your local (or non-local)
+UTC offset is. Defaults to 0. 
+
+Internals note: all times are internally stored in UTC, even though they
+may have some offset information. Offsets are internally stored in
+signed integer seconds. 
+
 =cut
+
+sub offset {
+    my $self = shift;
+    my $class = ref($self);
+
+    my ($offset, $newoffset) = undef;
+
+    if ( $offset = shift ) {    # Passed in a new value
+        
+        if ($offset =~ /([+-])(\d\d)(\d\d)/) {
+            my ($sign, $hours, $minutes) = ($1, $2, $3);
+
+            # convert to seconds, ignoring the possibility of leap seconds
+            # or daylight-savings-time shifts
+            $newoffset = $hours*60*60 + $minutes*60;   
+            $newoffset = $sign . $newoffset;      # this is probably inefficient
+
+            $self->{offset} = $newoffset;
+            
+        } elsif ($offset =~ /[+-]?0*/) {
+            $newoffset = 0;
+            $self->{offset} = $newoffset;
+            
+        } else {
+            carp "You gave an offset, $offset, that makes no sense";
+            return undef;
+        }
+        
+
+    } else {    
+        
+        if ($self->{offset}) {
+               
+            $self->{offset} =~ /([+-])(\d+)/;
+
+            my ($sign, $temp) = ($1, $2);
+            my $hours = $temp / (60*60);
+            my $minutes = ($temp % (60*60) ) / 60;
+
+            # We ignore the possibility that there could be seconds that are
+            # non-whole-minute.
+            
+            $offset = sprintf("%s%02d%02d", $sign, $hours, $minutes);
+        } else {
+            $offset = 0;
+        }
+    }
+
+    return $offset;
+}
+
+#}}}
+
+# sub add #{{{
 
 =head2 add
 
@@ -261,8 +332,6 @@ hexadecember.
 
 =cut
 
-# sub add #{{{
-
 sub add {
     my $self = shift;
     my %args = @_;
@@ -280,7 +349,7 @@ sub add {
       } else {
 
         $seconds =  0;
-        $seconds += $args{sec}                      if defined $args{secs};
+        $seconds += $args{sec}                      if defined $args{sec};
         $seconds += $args{min}  * 60                if defined $args{min};
         $seconds += $args{hour} * 60 * 60           if defined $args{hour};
         $seconds += $args{day}  * 60 * 60 * 24      if defined $args{day};
@@ -333,6 +402,8 @@ sub duration_as_sec {
 
 #}}}
 
+# sub compare #{{{
+
 =head2 compare
 
     $cmp = $date1->compare($date2);
@@ -366,6 +437,8 @@ sub compare {
 #    # if we got all this way and haven't yet returned, the units are equal.
     return 0;
 }
+
+#}}}
 
 =begin internal
 
@@ -689,6 +762,16 @@ Net::ICal
 =head1 CVS History
 
   $Log: ICal.pm,v $
+  Revision 1.33  2001/08/25 12:20:30  rbowen
+  Fixed bug reported by Chris Jones. In sub add, I was checking one
+  attribute and using another. Added tests for this bug, and for adding
+  durations by attribute.
+
+  Revision 1.32  2001/08/10 03:27:47  srl
+  Started adding timezone support by making an offset() method and an offset
+  property. This still needs to be wired into the new() method and the
+  output methods, but we have to resolve some interface details first.
+
   Revision 1.31  2001/08/07 02:41:11  rbowen
   Test::More gets angry if there are no tests.
 
@@ -722,7 +805,8 @@ Net::ICal
   were doing.
 
 
+=cut
+
 #}}}
 
-=cut
 
