@@ -1,10 +1,8 @@
-# $Header: /home/cvs/date-ical/t/00load.t,v 1.2 2001/06/15 04:21:19 rbowen Exp $
+# $Header: /cvsroot/reefknot/Date-ICal/t/00load.t,v 1.2 2001/07/04 03:33:49 rbowen Exp $
+
+use Test::More qw(no_plan);
 
 # Check to see if it loads
 
-BEGIN { $| = 1; print "1..1\n"; }
-END {print "not ok 1\n" unless $loaded;}
-use Date::ICal;
-$loaded = 1;
-print "ok 1\n";
+BEGIN{ use_ok( 'Date::ICal' ); }
 

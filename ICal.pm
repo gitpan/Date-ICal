@@ -2,7 +2,7 @@ package Date::ICal;
 use strict;
 
 use vars qw($VERSION);
-$VERSION = (qw'$Revision: 1.14 $')[1];
+$VERSION = (qw'$Revision: 1.15 $')[1];
 use Carp;
 use Time::Local;
 
@@ -50,6 +50,22 @@ If you call new without any arguments, you'll get a Date::ICal object that is
 set to the time right now.
 
     my $ical = Date::ICal->new();
+
+=begin testing
+
+use lib '../blib/lib';
+use Date::ICal;
+
+my $t1 = Date::ICal->new(epoch => '0');
+ok ($t1->epoch() eq '0', 'creation test from epoch (compare to epoch)');
+ok ($t1->ical() eq '19700101', 'creation test from epoch (compare to ical)');
+
+$t1 = Date::ICal->new(epoch => '3600');
+ok ($t1->epoch() eq '3600', 'creation test from epoch = 3600 (compare to epoch)');
+ok ($t1->ical() eq '19700101T010000', 'creation test from epoch (compare to ical = 19700101T010000Z)');
+
+
+=end testing
 
 =cut
 
@@ -131,13 +147,28 @@ from the ICal representation if we are not sure that they are in synch. We'll
 need to do clever things to keep track of when the two may not be in synch.
 And, of course, the same will go for any subclasses of this class.
 
+=begin testing
+
+my $epochtest = Date::ICal->new (epoch => '0');
+
+ok($epochtest->epoch() == '0', "Epoch 0 as epoch-time is 0");
+ok($epochtest->ical() eq '19700101', "Epoch 0 as ical is 19700101");
+
+#poking at internal data structures to make sure it's doing the right thing
+ok($epochtest->hour() ==  '0', "Epoch 0 has hour 0 defined");
+ok($epochtest->min() == '0', "Epoch 0 has minute 0 defined");
+ok($epochtest->sec() == '0', "Epoch 0 has second 0 defined");
+=end testing
+
 =cut
 
 #{{{ sub epoch
+
 sub epoch {
+
     my ( $self, $epoch ) = @_;
 
-    if ( defined($epoch) ) {
+    if ( defined($epoch) ) { # Passed in a new value
 
         my ( $ss, $mm, $hh, $DD, $MM, $YY ) = gmtime($epoch);
 
@@ -148,11 +179,12 @@ sub epoch {
         $self->{minute} = $mm;
         $self->{second} = $ss;
 
-        $self->_format_ical;
+        $self->_format_ical; # Set the definitive value
     }
 
     unless ( exists $self->{epoch} ) {
-        $self->_parse_ical;
+        # Recalculate from the authoritative source
+        $self->{epoch} = $self->_epoch_from_ical;
     }
 
     return $self->{epoch};
@@ -174,6 +206,39 @@ Generic set/get methods.
     $sec = $t->second;
 
     $t->minute(12);
+
+=begin testing
+
+my $acctest = Date::ICal->new(ical => "19920405T160708Z");
+
+#TODO: clarify whether these accessors should be returning zero-padded numbers or not
+ok($acctest->sec() eq "08", "second accessor read is correct");
+ok($acctest->sec(22) eq "22", "second accessor read while write is correct");
+ok($acctest->sec() eq "22", "second accessor read after write is correct");
+
+ok($acctest->minute() eq "07", "minute accessor read is correct");
+ok($acctest->minute(16) eq "16", "minute accessor read while write is correct");
+ok($acctest->minute() eq "16", "minute accessor read after write is correct");
+
+ok($acctest->hour() eq "16", "hour accessor read is correct");
+ok($acctest->hour(1) eq "1", "hour accessor read while write is correct");
+ok($acctest->hour() eq "1", "hour accessor read after write is correct");
+
+# FIXME: why does it have to be "05" (not "5") to pass?
+ok($acctest->day() eq "05", "day accessor read is correct");
+ok($acctest->day(7) eq "7", "day accessor read while write is correct");
+ok($acctest->day() eq "7", "day accessor read after write is correct");
+
+# FIXME: compare to day() above, except passing tests here have no leading 0
+ok($acctest->month() eq "4", "month accessor read is correct");
+ok($acctest->month(1) eq "1", "month accessor read while write is correct");
+ok($acctest->month() eq "1", "month accessor read after write is correct");
+
+ok($acctest->year() eq "1992", "year accessor read is correct");
+ok($acctest->year(1990) eq "1990", "year accessor read while write is correct");
+ok($acctest->year() eq "1990", "year accessor read after write is correct");
+
+=end testing
 
 =cut
 
@@ -222,6 +287,52 @@ externally if you really wanted to) which repopulates other attributes based
 on the ical field. This should be called by various methods if an attribute is
 undefined.
 
+=begin testing
+
+my $parsetest = Date::ICal->new(ical => "19920405T160708Z");
+
+$parsetest->_parse_ical();
+
+ok($parsetest->{second} eq "08", "_parse_ical seconds are correct on ical time");
+ok($parsetest->{minute} eq "07", "_parse_ical minutes are correct on ical time");
+ok($parsetest->{hour} eq "16", "_parse_ical hours are correct on ical time");
+ok($parsetest->{day} eq "05", "_parse_ical days are correct on ical time");
+ok($parsetest->{month} eq "04", "_parse_ical months are correct on ical time");
+ok($parsetest->{year} eq "1992", "_parse_ical year is correct on ical time");
+ok($parsetest->{floating} eq "0", "_parse_ical floating flag is correct for UTC on ical time");
+
+ok($parsetest->{timezone} eq "UTC", "_parse_ical timezone is correct for UTC on ical time");
+
+$parsetest = Date::ICal->new(epoch => "0");
+
+$parsetest->_parse_ical();
+
+# TODO: should some of these tests be "eq", since we're testing for
+# leading zeroes and such occasionally? (Or are we?) --srl
+ok($parsetest->{second} == "0", "_parse_ical seconds are correct on epoch 0");
+ok($parsetest->{minute} == "0", "_parse_ical minutes are correct on epoch 0");
+ok($parsetest->{hour} == "0", "_parse_ical hours are correct on epoch 0");
+ok($parsetest->{day} == "01", "_parse_ical days are correct on epoch 0");
+ok($parsetest->{month} == "01", "_parse_ical months are correct on epoch 0");
+ok($parsetest->{year} == "1970", "_parse_ical year is correct on epoch 0");
+ok($parsetest->{floating} == "0", "_parse_ical floating flag is correct for UTC on epoch 0");
+
+ok($parsetest->{timezone} eq "UTC", "_parse_ical timezone is correct for UTC on epoch 0");
+
+# extra-epoch dates?
+
+my $preepoch = Date::ICal->new( ical => '18700523T164702Z' );
+ok( $preepoch->year == 1870, 'Pre-epoch year' );
+ok( $preepoch->month == 5, 'Pre-epoch month' );
+ok( $preepoch->sec == 2, 'Pre-epoch seconds' );
+
+my $postepoch = Date::ICal->new( ical => '23481016T041612Z' );
+ok( $postepoch->year == 2348, "Post-epoch year" );
+ok( $postepoch->day == 16, "Post-epoch day");
+ok( $postepoch->hour == 04, "Post-epoch hour");
+
+=end testing
+
 =cut
 
 #{{{ sub _parse_ical
@@ -261,7 +372,7 @@ sub _parse_ical {
         return undef;
     }
 
-    $self->{timezone} = $zflag ? 'UTC' : $tz;
+    $self->{timezone} = defined($zflag) ? 'UTC' : $tz;
 
     $self->{year}  = $year;
     $self->{month} = $month;
@@ -271,7 +382,7 @@ sub _parse_ical {
     $self->{minute} = $minute || 0;
     $self->{second} = $second || 0;
 
-    $self->{epoch} = $self->_epoch_from_ical;
+    #$self->{epoch} = $self->_epoch_from_ical;
 
     # TODO: this doesn't set the epoch time properly.
 }
@@ -284,6 +395,18 @@ sub _parse_ical {
 
 This is an internal method used to rebuild the ical string when one component,
 such as the C<second> or C<month> field has been changed.
+
+=begin testing
+
+my $time = Date::ICal->new (epoch => '0');
+
+# test that this function doesn't return undef
+ok($time->_format_ical(), '_format_ical is defined on zero epoch');
+
+ok($time->{ical} eq '19700101', '_format_ical is correct on zero epoch'); 
+
+
+=end testing
 
 =cut
 
@@ -306,6 +429,8 @@ sub _format_ical {
         $self->{ical} =
           ( $tz eq 'UTC' ) ? $self->{ical} . 'Z' : "TZID=$tz:" . $self->{ical};
     }
+
+    return $self->{ical};
 }
 
 #}}}
@@ -316,24 +441,42 @@ sub _format_ical {
 
 This is an internal method used to determine the epoch time from the ical value.
 
+=begin testing
+
+$epochtest = Date::ICal->new(epoch => '0');
+ok($epochtest->_epoch_from_ical == '0', "_epoch_from_ical from epoch => 0");
+
+# TODO: should this be "ical => '19700101Z'?
+$epochtest = {};
+$epochtest = Date::ICal->new(ical => '19700101');
+
+ok($epochtest->_epoch_from_ical == '0', 
+    "_epoch_from_ical = 0 if ical => 19700101");
+
+=end testing
+
 =cut
 
 #{{{ sub _epoch_from_ical
 sub _epoch_from_ical {
     my $self = shift;
 
+    foreach my $unit (qw(second minute hour day month year)) {
+        carp "$unit was not defined" unless defined $self->$unit;
+    }
+    
     my $epoch;
-    if ( $self->{hour} != 0 ) {
+    if ( $self->hour != 0 ) {
         $epoch = Time::Local::timegm(
-          $self->{second}, $self->{minute}, $self->{hour}, $self->{day},
-          $self->{month},  $self->{year}
+          $self->second, $self->minute, $self->hour, $self->day,
+          $self->month - 1,  $self->year - 1900
         );
 
     }
     else {
         $epoch =
-          Time::Local::timegm( 0, 0, 0, $self->{day}, $self->{month} - 1,
-          $self->{year} - 1900 );
+          Time::Local::timegm( 0, 0, 0, $self->day, $self->month - 1,
+          $self->year - 1900 );
     }
 
     return $epoch;
@@ -369,21 +512,21 @@ my $t = Date::ICal->new( ical => '19961122T183020' );
 $t->add( month => 2);
 
 #test 1 check year rollover works
-ok($t->year,1997);
+ok($t->year == 1997, "year rollover");
 #test 2 check month set on year rollover
-ok($t->month,1);
+ok($t->month == 1, "month set on year rollover");
 
 $t->add( week => 2 );
 
 #test 3 & 4 check year/month rollover with attrib setting
 $t->month(14);
-ok($t->year,1998);
-ok($t->month,2);
+ok($t->year == 1998, "year rollover with attrib setting");
+ok($t->month == 2, "month rollover with attrib setting");
 
 #test 5 & 6 test subtraction with attrib setting
 $t->month(-2);
-ok($t->year,1997);
-ok($t->month,10);
+ok($t->year == 1997, "subtraction with attrib setting (year)");
+ok($t->month == 10, "subtraction with attrib setting (month)");
 
 =end testing
 
@@ -391,13 +534,19 @@ ok($t->month,10);
 
 sub add {
     my ( $self, $attrib, $arg ) = @_;
-    my $pos = $arg > 0 ? "+" : "-";
+
+    carp "Date::ICal::add was called by an undefined object" unless defined($self);
+    carp "Date::ICal::add was called without an attribute" unless defined($attrib);
+    carp "Date::ICal::add was called without an attribute arg" unless defined($arg);
+    #my $pos = $arg > 0 ? "+" : "-";
+    # TODO: this seems not to be able to add anything but weeks or durations.
+    # That probably needs fixing.
     if ( $attrib eq 'week' ) { $arg *= 7; $attrib = "day"; }
     if ( $attrib eq 'duration' ) { return $self->add_duration($arg); }
     if ( $attrib =~ /^P/ ) { return $self->add_duration($attrib); }
     $self->$attrib( $self->$attrib() + $arg );
     $self->_alter_period($attrib);
-    $self->{epoch} = $self->_epoch_from_ical;
+    #$self->{epoch} = $self->_epoch_from_ical;
 }
 
 =head2 _normal
@@ -420,7 +569,7 @@ sub _normal {
     return $self->{$attrib};
 }
 
-=head2
+=head2 _month_length
 
   $self->_month_length();
 
@@ -452,7 +601,7 @@ my %period_prop = (
   }
 );
 
-=head _alter_period
+=head2 _alter_period
 
   $self->_alter_period($attrib);
 
@@ -538,17 +687,86 @@ sub add_duration {
 
 =head2 compare
 
-    $cmp = $date2 Date::ICal::compare $date2;
+    $cmp = $date1->compare($date2);
 
-    @dates = sort {$a Date::ICal::compare $b} @dates;
+    @dates = sort {$a->compare($b)} @dates;
 
-Compare two Date::ICal objects. Symantics should be compatible with
-sort.
+Compare two Date::ICal objects. Semantics are compatible with
+sort; returns -1 if $a < $b, 0 if $a == $b, 1 if $a > $b. 
+
+=begin testing
+use Date::ICal; 
+my $date1 = Date::ICal->new( ical => '19971024T120000');
+my $date2 = Date::ICal->new( ical => '19971024T120000');
+
+
+# make sure that comparing to itself eq 0
+my $identity = $date1->compare($date2);
+ok($identity == 0, "Identity comparison");
+
+$date2 = Date::ICal->new( ical => '19971024T120001');
+ok($date1->compare($date2) == -1, 'Comparison $a < $b, 1 second diff');
+
+$date2 = Date::ICal->new( ical => '19971024T120100');
+ok($date1->compare($date2) == -1, 'Comparison $a < $b, 1 minute diff');
+
+$date2 = Date::ICal->new( ical => '19971024T130000');
+ok($date1->compare($date2) == -1, 'Comparison $a < $b, 1 hour diff');
+
+$date2 = Date::ICal->new( ical => '19971025T120000');
+ok($date1->compare($date2) == -1, 'Comparison $a < $b, 1 day diff');
+
+$date2 = Date::ICal->new( ical => '19971124T120000');
+ok($date1->compare($date2) == -1, 'Comparison $a < $b, 1 month diff');
+
+$date2 = Date::ICal->new( ical => '19981024T120000');
+ok($date1->compare($date2) == -1, 'Comparison $a < $b, 1 year diff');
+
+# $a > $b tests
+
+$date2 = Date::ICal->new( ical => '19971024T115959');
+ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 second diff');
+
+$date2 = Date::ICal->new( ical => '19971024T115900');
+ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 minute diff');
+
+$date2 = Date::ICal->new( ical => '19971024T110000');
+ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 hour diff');
+
+$date2 = Date::ICal->new( ical => '19971023T120000');
+ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 day diff');
+
+$date2 = Date::ICal->new( ical => '19970924T120000');
+ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 month diff');
+
+$date2 = Date::ICal->new( ical => '19961024T120000');
+ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 year diff');
+
+
+=end testing
 
 =cut
 
 sub compare {
+    my ($self, $otherdate) = (@_);
 
+    unless (defined($otherdate)) {return undef};
+    
+    # here, we walk through units from largest to smallest;
+    # if we find a difference, then it's reflective of the difference
+    # between the units as a whole. 
+    my @units = qw(year month day hour minute second);
+
+    foreach my $unit (@units) {
+        if ($self->$unit < $otherdate->$unit) {
+            return -1;
+        } elsif ($self->$unit > $otherdate->$unit) {
+            return 1;
+        } 
+        # if they're equal for this unit, fall through to the next smaller unit.
+    }
+    # if we got all this way and haven't yet returned, the units are equal.
+    return 0;
 }
 
 1;
