@@ -2,7 +2,7 @@ package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths);
-$VERSION = (qw'$Revision: 1.53 $')[1];
+$VERSION = (qw'$Revision: 1.54 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -812,6 +812,8 @@ sub greg2jd {
 
 =head2 days_this_year
 
+  $yday = Date::ICal::days_this_year($day, $month, $year);
+
 Returns the number of days so far this year. Analogous to the yday
 attribute of gmtime (or localtime) except that it works outside of the
 epoch.
@@ -819,7 +821,7 @@ epoch.
 =cut
 
 sub days_this_year {
-    my ($y,$m,$d) = @_;
+    my ($d,$m,$y) = @_;
     my $jd = greg2jd($y,$m,$d);
     my $janone = greg2jd($y,1,1);
     return $jd - $janone;
@@ -989,6 +991,10 @@ Net::ICal
 =head1 CVS History
 
   $Log: ICal.pm,v $
+  Revision 1.54  2001/11/24 18:57:37  rbowen
+  Oops. I reversed the order of the argument list when I added this
+  function back in, thereby breaking all code that was calling it.
+
   Revision 1.53  2001/11/24 16:25:10  rbowen
   Since _seconds_from_offset returns a number, not a string, we only need
   the sign if it is negative. Resolves some test failures that I was
