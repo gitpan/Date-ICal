@@ -2,7 +2,7 @@ package Date::ICal;
 use strict;
 
 use vars qw($VERSION);
-$VERSION = (qw'$Revision: 1.22 $')[1];
+$VERSION = (qw'$Revision: 1.23 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -127,8 +127,13 @@ sub new {
         foreach my $attrib(qw(day month year )) {
             warn "Attribute $attrib required" unless defined $args{$attrib};
         }
+        foreach my $attrib( qw( hour min sec ) ) {
+            $args{$attrib} = 0 unless defined $args{$attrib};
+        }
 
         # And then just use what was passed in
+        ( $sec, $min, $hour, $day, $month, $year ) =
+            @args{ 'sec', 'min', 'hour', 'day', 'month', 'year' };
     }    #}}}
 
     else {    # Just use current gmtime#{{{
