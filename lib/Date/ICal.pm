@@ -1,9 +1,9 @@
-# $Id: ICal.pm,v 1.69 2002/02/07 11:32:00 rbowen Exp $
+# $Id: ICal.pm,v 1.70 2002/06/26 21:21:20 rbowen Exp $
 package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths %add_units);
-$VERSION = (qw'$Revision: 1.69 $')[1];
+$VERSION = (qw'$Revision: 1.70 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -24,7 +24,7 @@ Date::ICal - Perl extension for ICalendar date objects.
 
 =head1 VERSION
 
-$Revision: 1.69 $
+$Revision: 1.70 $
 
 =head1 SYNOPSIS
 
@@ -34,7 +34,7 @@ $Revision: 1.69 $
     $ical = Date::ICal->new( epoch => time );
     $ical = Date::ICal->new( year => 1964,
         month => 10, day => 16, hour => 16,
-        min => 12, sec => 47, tz => '0530' );
+        min => 12, sec => 47 );
 
     $hour = $ical->hour;
     $year = $ical->year;
