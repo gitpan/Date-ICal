@@ -1,9 +1,9 @@
-# $Id: ICal.pm,v 1.68 2002/01/21 19:44:35 jesse Exp $
+# $Id: ICal.pm,v 1.69 2002/02/07 11:32:00 rbowen Exp $
 package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths %add_units);
-$VERSION = (qw'$Revision: 1.68 $')[1];
+$VERSION = (qw'$Revision: 1.69 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -24,7 +24,7 @@ Date::ICal - Perl extension for ICalendar date objects.
 
 =head1 VERSION
 
-$Revision: 1.68 $
+$Revision: 1.69 $
 
 =head1 SYNOPSIS
 
@@ -63,7 +63,7 @@ See http://dates.rcbowen.com/unified.txt for details
 
 Rich Bowen, and the Reefknot team (www.reefknot)
 
-Last touched by $Author: jesse $
+Last touched by $Author: rbowen $
 
 =head1 METHODS
 
@@ -273,7 +273,7 @@ sub ical {
         my $julian = $self->{julian};
         my $julsec = $self->{julsec};
         my $adjust = _offset_to_seconds( $args{offset} );
-        $self->add( seconds => -$adjust );
+        $self->add( seconds => $adjust );
         $ical =
           sprintf( '%04d%02d%02dT%02d%02d%02d', $self->year, $self->month,
           $self->day, $self->hour, $self->minute, $self->second, );
@@ -349,7 +349,7 @@ sub epoch {
 
     $seconds_plus_or_minus = offset_to_seconds($offset);
    
-Changes -0600 to -18000. Not object method, no side-effects.
+Changes -0600 to -21600. Not object method, no side-effects.
 
 =cut
 

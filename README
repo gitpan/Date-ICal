@@ -2,7 +2,7 @@ NAME
     Date::ICal - Perl extension for ICalendar date objects.
 
 VERSION
-    $Revision: 1.68 $
+    $Revision: 1.69 $
 
 SYNOPSIS
         use Date::ICal;
@@ -39,7 +39,7 @@ DESCRIPTION
 AUTHOR
     Rich Bowen, and the Reefknot team (www.reefknot)
 
-    Last touched by $Author: jesse $
+    Last touched by $Author: rbowen $
 
 METHODS
     Date::ICal has the following methods available:
@@ -129,7 +129,7 @@ METHODS
 
         $seconds_plus_or_minus = offset_to_seconds($offset);
    
-    Changes -0600 to -18000. Not object method, no side-effects.
+    Changes -0600 to -21600. Not object method, no side-effects.
 
   _offset_from_seconds
 
@@ -391,7 +391,7 @@ NAME
     Date::ICal::Duration - durations in iCalendar format, for math purposes.
 
 VERSION
-    $Revision: 1.10 $
+    $Revision: 1.61 $
 
 SYNOPSIS
         use Date::ICal::Duration;

@@ -1,3 +1,15 @@
+2002-02-07 06:33  rbowen
+
+	* lib/Date/ICal/Duration.pm (1.61): Bumping up the version number
+	on Duration.pm so that CPAN reports useful information about what
+	the latest version is.
+
+2002-02-07 06:32  rbowen
+
+	* lib/Date/ICal.pm (1.69), t/08offset.t (1.9): Remove skip in test,
+	and actually test the localtime functionality.	Adjust seconds the
+	correct direction in the ical method.
+
 2002-01-21 14:44  jesse
 
 	* lib/Date/ICal.pm (1.68): Date::ICal->new bitched if you were

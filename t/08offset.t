@@ -84,12 +84,9 @@ ok($t2->ical() =~ /Z$/, "Default ical() output is in UTC");
 is($t2->ical(), $utctime, 
     "Default ical() output in UTC is correct when an object is initialized with an offset");
 
-SKIP: {
-    skip '$TZ is not set in your shell, localtime output won\'t work', 1 
-        unless (defined $ENV{TZ});
-    is($t2->ical( { localtime => 1 } ), $loctime,      
-        "Localtime ical( { localtime => 1 }) output is correct"); 
-}
+is($t2->ical( localtime => 1 ), $loctime,
+    "Localtime ical( localtime => 1 ) output is correct");
+
 is($t2->ical(), $utctime,    
     "Default ical() output in UTC is correct after localtime access made");           
 

@@ -1,11 +1,11 @@
-# $Header: /cvsroot/reefknot/Date-ICal/lib/Date/ICal/Duration.pm,v 1.10 2001/12/27 02:07:50 rbowen Exp $
+# $Header: /cvsroot/reefknot/Date-ICal/lib/Date/ICal/Duration.pm,v 1.61 2002/02/07 11:33:21 rbowen Exp $
 package Date::ICal::Duration;
 
 use strict;
 use Carp;
 
 use vars qw($VERSION );
-$VERSION = (qw'$Revision: 1.10 $')[1];
+$VERSION = (qw'$Revision: 1.61 $')[1];
 
 # Documentation {{{
 
@@ -15,7 +15,7 @@ Date::ICal::Duration - durations in iCalendar format, for math purposes.
 
 =head1 VERSION
 
-$Revision: 1.10 $
+$Revision: 1.61 $
 
 =head1 SYNOPSIS
 
