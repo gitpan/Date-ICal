@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = (qw'$Revision: 1.29 $')[1];
+$VERSION = (qw'$Revision: 1.31 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -81,14 +81,9 @@ from one calendar to another:
 use lib '../blib/lib';
 use Date::ICal;
 
-my $t1 = Date::ICal->new(epoch => '0');
-ok ($t1->epoch() eq '0', 'creation test from epoch (compare to epoch)');
-ok ($t1->ical() eq '19700101Z', 'creation test from epoch (compare to ical)');
-
-$t1 = Date::ICal->new(epoch => '3600');
-ok ($t1->epoch == 3600, 'creation test from epoch = 3600 (compare to epoch)');
-ok ($t1->ical eq '19700101T010000Z', 'creation test from epoch (compare to ical = 19700101T010000Z)');
-
+my $ical = Date::ICal->new;
+ok( defined($ical), "Create object");
+ok( $ical->epoch == time, "Value defaults to now" );
 
 =end testing
 
@@ -170,16 +165,6 @@ sub new {
     bless $self, $class;
     return $self;
 }
-
-=begin testing
-
-my $now = time;
-my $nowtest = Date::ICal->new();
-my $nowtest2 = Date::ICal->new( epoch => $now );
-ok( $nowtest->hour == $nowtest2->hour, "Hour: Create without args");
-ok( $nowtest->month == $nowtest2->month, "Month : Create without args");
-ok( $nowtest->minute == $nowtest2->minute, "Minute: Create without args");
-
 #}}}
 
 =head2 ical
@@ -226,20 +211,6 @@ from the ICal representation if we are not sure that they are in synch. We'll
 need to do clever things to keep track of when the two may not be in synch.
 And, of course, the same will go for any subclasses of this class.
 
-=begin testing
-
-my $epochtest = Date::ICal->new (epoch => '0');
-
-ok($epochtest->epoch() == '0', "Epoch 0 as epoch-time is 0");
-ok($epochtest->ical() eq '19700101Z', "Epoch 0 as ical is 19700101");
-
-#poking at internal data structures to make sure it's doing the right thing
-ok($epochtest->hour() ==  '0', "Epoch 0 has hour 0 defined");
-ok($epochtest->min() == '0', "Epoch 0 has minute 0 defined");
-ok($epochtest->sec() == '0', "Epoch 0 has second 0 defined");
-
-=end testing
-
 =cut
 
 #{{{ sub epoch
@@ -267,57 +238,6 @@ sub epoch {
     return $epoch;
 }
 
-=begin testing
-
-$epochtest = Date::ICal->new(epoch => '997122970');
-ok ( $epochtest->epoch( 997121000 ) == 997121000,
-    "Setting epoch returns correct value");
-ok( $epochtest->epoch == 997121000, "And the value stuck" );
-ok( $epochtest->hour == 18, "Hour, after setting epoch" );
-ok( $epochtest->min == 3, "Min, after setting epoch" );
-
-=end testing
-
-#}}}
-
-=begin testing
-
-#{{{
-
-my $acctest = Date::ICal->new(ical => "19920405T160708Z");
-
-ok($acctest->sec == 8, "second accessor read is correct");
-ok($acctest->minute == 7, "minute accessor read is correct");
-ok($acctest->hour == 16, "hour accessor read is correct");
-ok($acctest->day == 5, "day accessor read is correct");
-ok($acctest->month == 4, "month accessor read is correct");
-ok($acctest->year == 1992, "year accessor read is correct");
-
-$parsetest = Date::ICal->new(epoch => "0");
-
-ok($parsetest->second == 0, "_parse_ical seconds are correct on epoch 0");
-ok($parsetest->minute == 0, "_parse_ical minutes are correct on epoch 0");
-ok($parsetest->hour == 0, "_parse_ical hours are correct on epoch 0");
-ok($parsetest->day == 1, "_parse_ical days are correct on epoch 0");
-ok($parsetest->month == 1, "_parse_ical months are correct on epoch 0");
-ok($parsetest->year == 1970, "_parse_ical year is correct on epoch 0");
-
-# ok($parsetest->{timezone} eq "UTC", "_parse_ical timezone is correct for UTC on epoch 0");
-
-# extra-epoch dates?
-
-my $preepoch = Date::ICal->new( ical => '18700523T164702Z' );
-ok( $preepoch->year == 1870, 'Pre-epoch year' );
-ok( $preepoch->month == 5, 'Pre-epoch month' );
-ok( $preepoch->sec == 2, 'Pre-epoch seconds' );
-
-my $postepoch = Date::ICal->new( ical => '23481016T041612Z' );
-ok( $postepoch->year == 2348, "Post-epoch year" );
-ok( $postepoch->day == 16, "Post-epoch day");
-ok( $postepoch->hour == 04, "Post-epoch hour");
-
-=end testing
-
 #}}}
 
 =cut
@@ -338,67 +258,6 @@ hexadecember.
 
    $self->add( month=>2 );
    $self->add( duration =>'P1W' );
-
-=begin testing
-
-#  Pod::Tests testing #{{{
-
-my $t = Date::ICal->new( ical => '19961122T183020' );
-$t->add( week => 8);
-
-ok($t->year == 1997, "year rollover");
-ok($t->month == 1, "month set on year rollover");
-
-$t->add( week => 2 );
-
-# Now, test the adding of durations
-$t = Date::ICal->new (ical => '19860128T163800Z');
-
-$t->add(duration => 'PT1M12S');
-ok ($t->ical eq '19860128T163912Z', "Adding durations with minutes and seconds works");
-
-$t = Date::ICal->new (ical => '19860128T163800Z');
-
-$t->add(duration => 'PT30S');
-ok ($t->ical eq '19860128T163830Z', "Adding durations with seconds only works");
-
-$t = Date::ICal->new (ical => '19860128T163800Z');
-
-$t->add(duration => 'PT1H10M');
-ok ($t->ical eq '19860128T174800Z', "Adding durations with hours and minutes works");
-
-
-$t = Date::ICal->new (ical => '19860128T163800Z');
-
-$t->add(duration => 'P3D');
-# XXX: what's "right" in the following test? should the result
-# just be a date, or a date and time?
-ok ($t->ical eq '19860131T163800Z', "Adding durations with days only works");
-
-
-$t = Date::ICal->new (ical => '19860128T163800Z');
-
-$t->add(duration => 'P3DT2H');
-ok ($t->ical eq '19860131T183800Z', "Adding durations with days and hours works");
-
-
-$t = Date::ICal->new (ical => '19860128T163800Z');
-
-$t->add(duration => 'P3DT2H20M15S');
-ok ($t->ical eq '19860131T185815Z', "Adding durations with days, hours, minutes, and seconds works");
-
-# Add 15M - this test failing in N::I::Time
-$t = Date::ICal->new( ical =>  '20010405T160000Z');
-$t->add( duration => 'PT15M' );
-ok( $t->ical eq '20010405T161500Z', "Adding minutes to an ical string");
-
-# Subtract a duration
-$t->add( duration => '-PT15M' );
-ok( $t->ical eq '20010405T160000Z', "Back where we started");
-
-=end testing
-
-#}}}
 
 =cut
 
@@ -482,62 +341,6 @@ sub duration_as_sec {
 
 Compare two Date::ICal objects. Semantics are compatible with
 sort; returns -1 if $a < $b, 0 if $a == $b, 1 if $a > $b. 
-
-# Pod::Tests tests #{{{
-
-=begin testing
-
-use Date::ICal; 
-my $date1 = Date::ICal->new( ical => '19971024T120000');
-my $date2 = Date::ICal->new( ical => '19971024T120000');
-
-
-# make sure that comparing to itself eq 0
-my $identity = $date1->compare($date2);
-ok($identity == 0, "Identity comparison");
-
-$date2 = Date::ICal->new( ical => '19971024T120001');
-ok($date1->compare($date2) == -1, 'Comparison $a < $b, 1 second diff');
-
-$date2 = Date::ICal->new( ical => '19971024T120100');
-ok($date1->compare($date2) == -1, 'Comparison $a < $b, 1 minute diff');
-
-$date2 = Date::ICal->new( ical => '19971024T130000');
-ok($date1->compare($date2) == -1, 'Comparison $a < $b, 1 hour diff');
-
-$date2 = Date::ICal->new( ical => '19971025T120000');
-ok($date1->compare($date2) == -1, 'Comparison $a < $b, 1 day diff');
-
-$date2 = Date::ICal->new( ical => '19971124T120000');
-ok($date1->compare($date2) == -1, 'Comparison $a < $b, 1 month diff');
-
-$date2 = Date::ICal->new( ical => '19981024T120000');
-ok($date1->compare($date2) == -1, 'Comparison $a < $b, 1 year diff');
-
-# $a > $b tests
-
-$date2 = Date::ICal->new( ical => '19971024T115959');
-ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 second diff');
-
-$date2 = Date::ICal->new( ical => '19971024T115900');
-ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 minute diff');
-
-$date2 = Date::ICal->new( ical => '19971024T110000');
-ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 hour diff');
-
-$date2 = Date::ICal->new( ical => '19971023T120000');
-ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 day diff');
-
-$date2 = Date::ICal->new( ical => '19970924T120000');
-ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 month diff');
-
-$date2 = Date::ICal->new( ical => '19961024T120000');
-ok($date1->compare($date2) == 1, 'Comparison $a > $b, 1 year diff');
-
-
-=end testing
-
-#}}}
 
 =cut
 
@@ -886,6 +689,14 @@ Net::ICal
 =head1 CVS History
 
   $Log: ICal.pm,v $
+  Revision 1.31  2001/08/07 02:41:11  rbowen
+  Test::More gets angry if there are no tests.
+
+  Revision 1.30  2001/08/07 02:30:01  rbowen
+  Moved the inline tests into t/ for the sake of making the module more
+  readable. Please don't let this discorage you from writing inline
+  tests.
+
   Revision 1.29  2001/08/06 19:32:39  rbowen
   Creating an object without args was calling gmtime( $args{epoch} ).
   Fixed and added tests. Also added Time::HiRes to PREREQ list.
