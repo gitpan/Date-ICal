@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = (qw'$Revision: 1.28 $')[1];
+$VERSION = (qw'$Revision: 1.29 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -155,7 +155,7 @@ sub new {
     else {    # Just use current gmtime#{{{
 
         ( $sec, $min, $hour, $day, $month, $year ) =
-          ( gmtime( $args{epoch} ) )[ 0, 1, 2, 3, 4, 5 ];
+          ( gmtime( time ))[ 0 .. 5 ];
         $year += 1900;
         $month++;
     }    #}}}
@@ -170,6 +170,15 @@ sub new {
     bless $self, $class;
     return $self;
 }
+
+=begin testing
+
+my $now = time;
+my $nowtest = Date::ICal->new();
+my $nowtest2 = Date::ICal->new( epoch => $now );
+ok( $nowtest->hour == $nowtest2->hour, "Hour: Create without args");
+ok( $nowtest->month == $nowtest2->month, "Month : Create without args");
+ok( $nowtest->minute == $nowtest2->minute, "Minute: Create without args");
 
 #}}}
 
@@ -877,6 +886,10 @@ Net::ICal
 =head1 CVS History
 
   $Log: ICal.pm,v $
+  Revision 1.29  2001/08/06 19:32:39  rbowen
+  Creating an object without args was calling gmtime( $args{epoch} ).
+  Fixed and added tests. Also added Time::HiRes to PREREQ list.
+
   Revision 1.28  2001/08/06 18:45:47  rbowen
   sub epoch was referencing another sub that has gone away. Fixed, and
   added tests.
