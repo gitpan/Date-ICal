@@ -2,13 +2,12 @@ package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths);
-$VERSION = (qw'$Revision: 1.55 $')[1];
+$VERSION = (qw'$Revision: 1.57 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
-use overload
-   '<=>' => 'compare',
-   'fallback' => 1;
+use overload '<=>' => 'compare',
+  'fallback' => 1;
 
 $localzone   = $ENV{TZ} || 0;
 $localoffset = _calc_local_offset();
@@ -18,6 +17,10 @@ $localoffset = _calc_local_offset();
 =head1 NAME
 
 Date::ICal - Perl extension for ICalendar date objects.
+
+=head1 VERSION
+
+$Revision: 1.57 $
 
 =head1 SYNOPSIS
 
@@ -42,10 +45,15 @@ other date/calendar modules that know about ICal time format also.
 
 See http://dates.rcbowen.com/unified.txt for details
 
+=head1 AUTHOR
+
+Rich Bowen, and the Reefknot team (www.reefknot)
+
+Last touched by $Author: rbowen $
+
 =head1 METHODS
 
 Date::ICal has the following methods available:
-
 
 =head2 new
 
@@ -106,7 +114,7 @@ your local offset. If $TZ isn't set, new() will complain.
 
 sub new {
     my $class = shift;
-    my ( $self, %args, $sec, $min, $hour, $day, $month, $year, $tz);
+    my ( $self, %args, $sec, $min, $hour, $day, $month, $year, $tz );
 
     # $zflag indicates whether or not this time is natively in UTC    
     my $zflag = 0;
@@ -114,11 +122,11 @@ sub new {
     # First argument can be a Date::ICal (or subclass thereof) object
     if ( ref $_[0] ) {
         $args{ical} = $_[0]->ical;
-    } else {
+      } else {
         %args = @_;
     }
-    
-    $self = {}; 
+
+    $self = {};
 
     # Date is specified as epoch#{{{
     if ( defined( $args{epoch} ) ) {
@@ -129,8 +137,8 @@ sub new {
         $month++;
 
         # TODO: is this what we really want here? I think so --srl
-        $zflag = 1;     # epoch times are by definition in GMT
-        
+        $zflag = 1;    # epoch times are by definition in GMT
+
     }    #}}}
 
     # Date is specified as ical string#{{{
@@ -144,15 +152,14 @@ sub new {
         ( $year, $month, $day, $hour, $min, $sec, $zflag ) =
           $args{ical} =~ /^(?:(\d{4})(\d\d)(\d\d))
                (?:T(\d\d)?(\d\d)?(\d\d)?)?
-                       (Z)?$/x;
+                         (Z)?$/x;
 
-        
         # TODO: figure out what to do if we get a TZID. 
         # I'd suggest we store it for use by modules that care
         # about TZID names. But we don't want this module
         # to deal with timezone names, only offsets, I think.
         # --srl
-        
+
     }    #}}}
 
     # Time specified as components#{{{
@@ -162,53 +169,52 @@ sub new {
         foreach my $attrib(qw(day month year )) {
             warn "Attribute $attrib required" unless defined $args{$attrib};
         }
-        foreach my $attrib( qw( hour min sec ) ) {
+        foreach my $attrib(qw( hour min sec )) {
             $args{$attrib} = 0 unless defined $args{$attrib};
         }
 
         # And then just use what was passed in
         ( $sec, $min, $hour, $day, $month, $year ) =
-            @args{ 'sec', 'min', 'hour', 'day', 'month', 'year' };
-            
+          @args{ 'sec', 'min', 'hour', 'day', 'month', 'year' };
+
     }    #}}}
 
     else {    # Just use current gmtime#{{{
 
-		# Since we are defaulting, this qualifies as UTC
-		$zflag = 1;
+        # Since we are defaulting, this qualifies as UTC
+        $zflag = 1;
 
-        ( $sec, $min, $hour, $day, $month, $year ) =
-          ( gmtime( time ))[ 0 .. 5 ];
+        ( $sec, $min, $hour, $day, $month, $year ) = ( gmtime(time) )[ 0 .. 5 ];
         $year += 1900;
         $month++;
     }    #}}}
-    
+
     $self->{julian} = greg2jd( $year, $month, $day );
     $self->{julsec} = time_as_seconds( $hour, $min, $sec );
-    bless $self, $class; 
- 
-	if (exists($args{offset})) {
+    bless $self, $class;
+
+    if ( exists( $args{offset} ) ) {
         if ($zflag) {
-			carp "Time had conflicting offset and UTC info. Using UTC"
-				unless $ENV{HARNESS_ACTIVE};
-        } else {
+            carp "Time had conflicting offset and UTC info. Using UTC"
+              unless $ENV{HARNESS_ACTIVE};
+          } else {
+
             # Set up the offset for this datetime.
-            $self->offset($args{offset} || 0);
+            $self->offset( $args{offset} || 0 );
         }
-	} elsif (! $zflag) {
-        unless (defined $ENV{TZ}) {
-            carp 'the environment variable $TZ is not set'
-                unless $ENV{HARNESS_ACTIVE};
-        }
-        my $tz = $ENV{TZ} || '0';
-		my $loc = $tz eq $localzone ?  $localoffset : _calc_local_offset();
-		carp "saw no offset; setting offset to $loc"
-			unless $ENV{HARNESS_ACTIVE};
-		$self->offset($loc) if defined $self;
+      } elsif ( !$zflag ) {
+
+        # Check if the timezone has changed since the last time we checked.
+        # Apparently this happens on some systems. Patch from Mike
+        # Heins. Ask him.
+        my $tz  = $ENV{TZ} || '0';
+        my $loc = $tz eq $localzone ? $localoffset : _calc_local_offset();
+        $self->offset($loc) if defined $self;
     }
- 
+
     return $self;
 }
+
 #}}}
 
 #{{{ sub ical
@@ -231,53 +237,51 @@ To get output relative to an arbitrary offset, do:
 
 sub ical {
     my $self = shift;
-    if (1&@_) {			# odd number of parameters?
-	carp "Bad args: expected named parameter list";
-	shift;			# avoid warning from %args=@_ assignment
+    if ( 1 & @_ ) {     # odd number of parameters?
+        carp "Bad args: expected named parameter list";
+        shift;    # avoid warning from %args=@_ assignment
     }
     my %args = @_;
     my $ical;
-    
-    if (exists $args{localtime}) {
-		carp "can't have localtime and offset together, using localtime offset"
-			if exists $args{offset};
+
+    if ( exists $args{localtime} ) {
+        carp "can't have localtime and offset together, using localtime offset"
+          if exists $args{offset};
+
         # make output in localtime format by setting $args{offset}
-		$args{offset} = $self->offset;
-	}
+        $args{offset} = $self->offset;
+    }
 
-    if (exists $args{offset}) {
+    if ( exists $args{offset} ) {
+
         # make output based on an arbitrary offset
-		# No Z on the end!
-		my $julian = $self->{julian};
-		my $julsec = $self->{julsec};
-		my $adjust =  _offset_to_seconds($args{offset});
-		$self->add(seconds => -$adjust);
-	    $ical = sprintf( '%04d%02d%02dT%02d%02d%02d',
-					$self->year, $self->month, $self->day,
-					$self->hour, $self->minute, $self->second,
-					);
-		$self->{julian} = $julian;
-		$self->{julsec} = $julsec;
-    } else {
-        # make output in UTC by default
-	    # if we were originally given this time in offset
-	    # form, we'll need to adjust it for output
-	    if ( $self->hour || $self->min || $self->sec ) {
-            $ical =
-                sprintf( '%04d%02d%02dT%02d%02d%02dZ', 
-                    $self->year, $self->month, $self->day, 
-                    $self->hour, $self->minute, $self->second );
-        } else {
-            $ical =
-                sprintf( '%04d%02d%02dZ', 
-                    $self->year, $self->month, $self->day );
-        }
-    } 
-    
-    return $ical;
-}
+        # No Z on the end!
+        my $julian = $self->{julian};
+        my $julsec = $self->{julsec};
+        my $adjust = _offset_to_seconds( $args{offset} );
+        $self->add( seconds => -$adjust );
+        $ical =
+          sprintf( '%04d%02d%02dT%02d%02d%02d', $self->year, $self->month,
+          $self->day, $self->hour, $self->minute, $self->second, );
+        $self->{julian} = $julian;
+        $self->{julsec} = $julsec;
+      } else {
 
-#}}}
+        # make output in UTC by default
+        # if we were originally given this time in offset
+        # form, we'll need to adjust it for output
+        if ( $self->hour || $self->min || $self->sec ) {
+            $ical =
+              sprintf( '%04d%02d%02dT%02d%02d%02dZ', $self->year, $self->month,
+              $self->day, $self->hour, $self->minute, $self->second );
+          } else {
+            $ical =
+              sprintf( '%04d%02d%02dZ', $self->year, $self->month, $self->day );
+        }
+    }
+
+    return $ical;
+}    #}}}
 
 #{{{ sub epoch
 
@@ -300,7 +304,7 @@ And, of course, the same will go for any subclasses of this class.
 =cut
 
 sub epoch {
-    my $self = shift;
+    my $self  = shift;
     my $class = ref($self);
 
     my $epoch;
@@ -336,26 +340,26 @@ Changes -0600 to -18000. Not object method, no side-effects.
 =cut
 
 sub _offset_to_seconds {
-	my $offset = shift;
+    my $offset = shift;
 
-	# Relocated from offset for re-use
-	my $newoffset;
+    # Relocated from offset for re-use
+    my $newoffset;
 
-	if ($offset eq '0') {
-		$newoffset = 0;
-	}
-	elsif ($offset =~ /^([+-])(\d\d)(\d\d)\z/) {
-		my ($sign, $hours, $minutes) = ($1, $2, $3);
-		# convert to seconds, ignoring the possibility of leap seconds
-		# or daylight-savings-time shifts
-		$newoffset = $hours*60*60 + $minutes*60;   
+    if ( $offset eq '0' ) {
+        $newoffset = 0;
+      } elsif ( $offset =~ /^([+-])(\d\d)(\d\d)\z/ )
+    {
+        my ( $sign, $hours, $minutes ) = ( $1, $2, $3 );
+
+        # convert to seconds, ignoring the possibility of leap seconds
+        # or daylight-savings-time shifts
+        $newoffset = $hours * 60 * 60 + $minutes * 60;
         $newoffset *= -1 if $sign eq '-';
-	}
-	else {
-		carp("You gave an offset, $offset, that makes no sense");
-		return undef;
-	}
-	return $newoffset;
+      } else {
+        carp("You gave an offset, $offset, that makes no sense");
+        return undef;
+    }
+    return $newoffset;
 }
 
 #}}}
@@ -372,27 +376,28 @@ Not object method, no side-effects.
 =cut
 
 sub _offset_from_seconds {
-	my $secoffset = shift;
+    my $secoffset  = shift;
     my $hhmmoffset = 0;
-    
-    if ($secoffset ne '0') {
-        my ($sign, $secs) = ("", "");
-        ($sign, $secs) = $secoffset =~ /([+-])?(\d+)/;
+
+    if ( $secoffset ne '0' ) {
+        my ( $sign, $secs ) = ( "", "" );
+        ( $sign, $secs ) = $secoffset =~ /([+-])?(\d+)/;
+
         # throw in a + to make this look like an offset if positive
-        $sign = "+" unless $sign;   
-       
+        $sign = "+" unless $sign;
+
         # NOTE: the following code will return "+0000" if you give it a number
         # of seconds that are a multiple of a day. However, for speed reasons
         # I'm not going to write in a comparison to reformat that back to 0.
         # 
-        my $hours = $secs / (60 * 60);
+        my $hours = $secs / ( 60 * 60 );
         $hours = $hours % 24;
-        my $mins = ($secs % (60 * 60))/60;
-        $hhmmoffset = sprintf('%s%02d%02d', $sign, $hours, $mins);
-        
+        my $mins = ( $secs % ( 60 * 60 ) ) / 60;
+        $hhmmoffset = sprintf( '%s%02d%02d', $sign, $hours, $mins );
+
     }
-    
-	return $hhmmoffset;
+
+    return $hhmmoffset;
 }
 
 #}}}
@@ -433,19 +438,20 @@ the ical() method. Either way will work.
 =cut
 
 sub offset {
-    my ($self, $offset) = @_;
+    my ( $self, $offset ) = @_;
     my $newoffset = undef;
 
     if ( defined($offset) ) {    # Passed in a new value
         $newoffset = _offset_to_seconds($offset);
 
-        unless (defined $newoffset) { return undef; }
+        unless ( defined $newoffset ) { return undef; }
 
         # since we're internally storing in GMT, we need to
         # adjust the time we were given by the offset so that
         # the internal date/time will be right.
 
-        if ($self->{offset}) {
+        if ( $self->{offset} ) {
+
             # figure out whether there's a difference between
             # the existing offset and the offset we were given.
             # If so, adjust appropriately.
@@ -453,30 +459,30 @@ sub offset {
 
             if ($offsetdiff) {
                 $self->{offset} = $newoffset;
-                $self->add(seconds => $offsetdiff);  
-            } else {
+                $self->add( seconds => $offsetdiff );
+              } else {
+
                 # leave the offset the way it is
             }
-        } else {
-            $self->add(seconds => -$newoffset);
+          } else {
+            $self->add( seconds => -$newoffset );
             $self->{offset} = $newoffset;
         }
 
-    } else {    
-        if ($self->{offset}) {
-            $offset = _offset_from_seconds($self->{offset});
-        } else {
+      } else {
+        if ( $self->{offset} ) {
+            $offset = _offset_from_seconds( $self->{offset} );
+          } else {
             $offset = 0;
         }
     }
-
 
     return $offset;
 }
 
 #}}}
 
-# sub add #{{{
+# sub add {{{
 
 =head2 add
 
@@ -506,89 +512,92 @@ sub add {
     carp "Date::ICal::add was called without an attribute arg"
       unless ( keys %args );
 
-    my ($seconds, $days);
+    my ( $seconds, $days );
 
     if ( defined $args{duration} ) {
 
-        ($days, $seconds) = duration_value( $args{duration} );
-    
-    } elsif (defined $args{seconds} ) {
-        $days = 0;
+        ( $days, $seconds ) = duration_value( $args{duration} );
+
+      } elsif ( defined $args{seconds} )
+    {
+        $days    = 0;
         $seconds = $args{seconds};
-    
-    } else {
 
-        $seconds =  0;
-        $seconds += $args{sec}             if defined $args{sec};
-        $seconds += $args{min}  * 60       if defined $args{min};
-        $seconds += $args{hour} * 60 * 60  if defined $args{hour};
+      } else {
+
+        $seconds = 0;
+        $seconds += $args{sec} if defined $args{sec};
+        $seconds += $args{min} * 60 if defined $args{min};
+        $seconds += $args{hour} * 60 * 60 if defined $args{hour};
 
         $days = 0;
-        $days += $args{day}       if defined $args{day};
-        $days += $args{week} * 7  if defined $args{week};
+        $days += $args{day} if defined $args{day};
+        $days += $args{week} * 7 if defined $args{week};
 
-        if ($args{month}) {
-            my @months = months($self->year);
-            my $start = $months[$self->month - 1];
-            my $end = $self->month + $args{month};
-            my $add = 0;
-            if ($end > 12) {
+        if ( $args{month} ) {
+            my @months = months( $self->year );
+            my $start  = $months[ $self->month - 1 ];
+            my $end    = $self->month + $args{month};
+            my $add    = 0;
+            if ( $end > 12 ) {
                 $end -= 12;
-                $add = $months[12];
-                @months = months($self->year + 1);
+                $add    = $months[12];
+                @months = months( $self->year + 1 );
             }
-            $end = $months[$end - 1] + $add;
+            $end = $months[ $end - 1 ] + $add;
 
             $days += $end - $start;
         }
 
-        if ($args{year}) {
-            foreach my $year ($self->year .. $self->year + $args{year} - 1) {
+        if ( $args{year} ) {
+            foreach my $year( $self->year .. $self->year + $args{year} - 1 ) {
                 my $leap = Date::Leapyear::isleap($year);
                 $days += 365 + $leap;
             }
 
             # Remove a day if the year that we started in was leap, but
             # we started *after* the leap day
-            if (Date::Leapyear::isleap($self->year) &&
-                days_this_year($self->day, $self->month, $self->year) >=
-                60) {
+            if ( Date::Leapyear::isleap( $self->year )
+              && days_this_year( $self->day, $self->month, $self->year ) >= 60 )
+            {
                 $days--;
             }
 
             # Add a day is the year we finish in is leap, and we end
             # *after* the leap day
-            if (Date::Leapyear::isleap($self->year + $args{year}) &&
-                days_this_year($self->day, $self->month, $self->year +
-                $args{year}) >= 60) {
+            if ( Date::Leapyear::isleap( $self->year + $args{year} )
+              && days_this_year( $self->day, $self->month,
+              $self->year + $args{year} ) >= 60 )
+            {
                 $days++;
             }
         }
 
-
     }
 
     # ick, we really don't want this.
-    my $daycount = int( $seconds/86400 );
+    my $daycount = int( $seconds / 86400 );
     $seconds -= ( $daycount * 86400 );
     $days += $daycount;
 
     $self->{julian} += $days;
-	$self->{julsec} += $seconds;
+    $self->{julsec} += $seconds;
 
     # Did we cross a day boundary?
-    if ($self->{julsec} < 0) {
+    if ( $self->{julsec} < 0 ) {
         $self->{julian}--;
         $self->{julsec} += 86400;
-    } elsif ($self->{julsec} >= 86400) {
+      } elsif ( $self->{julsec} >= 86400 )
+    {
         $self->{julian}++;
         $self->{julsec} -= 86400;
     }
     return $self;
 }
+
 #}}}
 
-# sub duration_value #{{{
+# sub duration_value {{{
 
 sub duration_value {
     my $str = shift;
@@ -605,7 +614,7 @@ sub duration_value {
                 (?:(\d+)M)? (?# Minutes)
                 (?:(\d+)S)? (?# Seconds)
             )?
-              }x;
+                }x;
     my ( $sign, $magic ) = @temp[ 0 .. 1 ];
     my ( $weeks, $days, $hours, $mins, $secs ) =
       map { defined($_) ? $_ : 0 } @temp[ 2 .. $#temp ];
@@ -618,12 +627,12 @@ sub duration_value {
 
     my $s = $sign * ( $secs + ( $mins * 60 ) + ( $hours * 3600 ) );
     my $d = $sign * ( $days + ( $weeks * 7 ) );
-    return ($d, $s);
+    return ( $d, $s );
 }
 
 #}}}
 
-# sub compare #{{{
+# sub compare {{{
 
 =head2 compare
 
@@ -643,19 +652,22 @@ sub compare {
 
     # One or more days different
 
-    if      ($self->{julian} < $otherdate->{julian}) {
+    if ( $self->{julian} < $otherdate->{julian} ) {
         return -1;
-    } elsif ($self->{julian} > $otherdate->{julian}) {
+      } elsif ( $self->{julian} > $otherdate->{julian} )
+    {
         return 1;
 
-    # They are the same day
-    } elsif ( $self->{julsec} < $otherdate->{julsec}) {
+        # They are the same day
+      } elsif ( $self->{julsec} < $otherdate->{julsec} )
+    {
         return -1;
-    } elsif ( $self->{julsec} > $otherdate->{julsec}) {
+      } elsif ( $self->{julsec} > $otherdate->{julsec} )
+    {
         return 1;
     }
 
-#    # if we got all this way and haven't yet returned, the units are equal.
+    #    # if we got all this way and haven't yet returned, the units are equal.
     return 0;
 }
 
@@ -675,13 +687,14 @@ Returns the Julian day at the end of a month, correct for that year.
 # have to do it repeatedly during runtime. 
 # 
 BEGIN {
-    #           +  31, 28, 31, 30,  31,  30,  31,  31,  30,  31,  30,  31
-	@months = ( 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365 );
-	@leapmonths = @months;
 
-	for ( 2 .. 12 ) {
-		$leapmonths[$_] = $months[$_] + 1;
-	}
+    #           +  31, 28, 31, 30,  31,  30,  31,  31,  30,  31,  30,  31
+    @months = ( 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365 );
+    @leapmonths = @months;
+
+    for ( 2 .. 12 ) {
+        $leapmonths[$_] = $months[$_] + 1;
+    }
 }
 
 sub months {
@@ -698,6 +711,8 @@ Returns the time of day as the number of seconds in the day.
 
 =cut
 
+# sub time_as_seconds {{{
+
 sub time_as_seconds {
     my ( $hour, $min, $sec ) = @_;
 
@@ -707,7 +722,9 @@ sub time_as_seconds {
 
     my $secs = $hour * 3600 + $min * 60 + $sec;
     return $secs;
-}
+} #}}}
+
+# sub day {{{
 
 =head2 day
 
@@ -721,8 +738,10 @@ Day is in the range 1..31
 
 sub day {
     my $self = shift;
-    return (jd2greg( $self->{julian} ))[2];
-}
+    return ( jd2greg( $self->{julian} ) )[2];
+} # }}}
+
+# sub month {{{
 
 =head2 month
 
@@ -736,10 +755,16 @@ Month is returned as a number in the range 1..12
 
 sub month {
     my $self = shift;
-    return (jd2greg( $self->{julian} ))[1];
-}
+    return ( jd2greg( $self->{julian} ) )[1];
+} # }}}
+
+# sub mon {{{
 
 sub mon { return month(@_); }
+
+#}}}
+
+# sub year {{{
 
 =head2 year
 
@@ -751,10 +776,10 @@ Returns the year.
 
 sub year {
     my $self = shift;
-    return (jd2greg( $self->{julian} ))[0];
-}
+    return ( jd2greg( $self->{julian} ) )[0];
+} # }}}
 
-# sub jd2greg #{{{
+# sub jd2greg {{{
 
 =head2 jd2greg
 
@@ -769,31 +794,36 @@ sub jd2greg {
     use integer;
     my $d = shift;
     my $yadj = 0;
-    my ($c,$y,$m);
+    my ( $c, $y, $m );
 
     # add 306 days to make relative to Mar 1, 0; also adjust $d to be within
     # a range (1..2**28-1) where our calculations will work with 32bit ints
-    if ($d > 2**28-307) {
-	# avoid overflow if $d close to maxint
-	$yadj = ($d-146097+306)/146097+1;
-	$d -= $yadj*146097 - 306;
-    } elsif (($d+=306) <= 0) {
-	$yadj = -(-$d/146097+1); # avoid ambiguity in C division of negatives
-	$d -= $yadj*146097;
+    if ( $d > 2**28 - 307 ) {
+
+        # avoid overflow if $d close to maxint
+        $yadj = ( $d - 146097 + 306 ) / 146097 + 1;
+        $d -= $yadj * 146097 - 306;
+      } elsif ( ( $d += 306 ) <= 0 )
+    {
+        $yadj =
+          -( -$d / 146097 + 1 );    # avoid ambiguity in C division of negatives
+        $d -= $yadj * 146097;
     }
 
-    $c = ($d*4-1)/146097;	# calc # of centuries $d is after 29 Feb of yr 0
-    $d -= $c*146097/4;		#     (4 centuries = 146097 days)
-    $y = ($d*4-1)/1461;		# calc number of years into the century,
-    $d -= $y*1461/4;		#     again March-based (4 yrs =~ 146[01] days)
-    $m = ($d*12+1093)/367;	# get the month (3..14 represent March through
-    $d -= ($m*367-1094)/12;     #     February of following year)
-    $y += $c*100+$yadj*400;	# get the real year, which is off by
-    ++$y, $m-=12 if $m > 12;	#     one if month is January or February
-    return ($y,$m,$d);
-} #}}}
+    $c =
+      ( $d * 4 - 1 ) / 146097;    # calc # of centuries $d is after 29 Feb of yr 0
+    $d -= $c * 146097 / 4;    #     (4 centuries = 146097 days)
+    $y = ( $d * 4 - 1 ) / 1461;    # calc number of years into the century,
+    $d -= $y * 1461 / 4;    #     again March-based (4 yrs =~ 146[01] days)
+    $m =
+      ( $d * 12 + 1093 ) / 367;    # get the month (3..14 represent March through
+    $d -= ( $m * 367 - 1094 ) / 12;    #     February of following year)
+    $y += $c * 100 + $yadj * 400;    # get the real year, which is off by
+    ++$y, $m -= 12 if $m > 12;         #     one if month is January or February
+    return ( $y, $m, $d );
+}    #}}}
 
-# sub greg2jd #{{{
+# sub greg2jd {{{
 
 =head2 greg2jd
 
@@ -808,21 +838,23 @@ sub jd2greg {
 
 sub greg2jd {
     use integer;
-    my ($y,$m,$d)=@_;
+    my ( $y, $m, $d ) = @_;
     my $adj;
 
     # make month in range 3..14 (treat Jan & Feb as months 13..14 of prev year)
-    if ($m <= 2) {
-	$y -= ($adj = (14-$m)/12);
-	$m += 12*$adj;
-    } elsif ($m > 14) {
-	$y += ($adj = ($m-3)/12);
-	$m -= 12*$adj;
+    if ( $m <= 2 ) {
+        $y -= ( $adj = ( 14 - $m ) / 12 );
+        $m += 12 * $adj;
+      } elsif ( $m > 14 )
+    {
+        $y += ( $adj = ( $m - 3 ) / 12 );
+        $m -= 12 * $adj;
     }
+
     # make year positive (oh, for a use integer 'sane_div'!)
-    if ($y < 0) {
-	$d -= 146097*($adj = (399-$y)/400);
-	$y += 400*$adj;
+    if ( $y < 0 ) {
+        $d -= 146097 * ( $adj = ( 399 - $y ) / 400 );
+        $y += 400 * $adj;
     }
 
     # add: day of month, days of previous 0-11 month period that began w/March,
@@ -830,8 +862,9 @@ sub greg2jd {
     # year), days of any 400-year periods before that, and 306 days to adjust
     # from Mar 1, year 0-relative to Jan 1, year 1-relative (whew)
 
-    $d += ($m*367-1094)/12 + $y%100*1461/4 + ($y/100*36524+$y/400) - 306;
-} # }}}
+    $d += ( $m * 367 - 1094 ) / 12 + $y % 100 * 1461 / 4 +
+      ( $y / 100 * 36524 + $y / 400 ) - 306;
+}    # }}}
 
 # sub days_this_year {{{
 
@@ -846,11 +879,13 @@ epoch.
 =cut
 
 sub days_this_year {
-    my ($d,$m,$y) = @_;
-    my $jd = greg2jd($y,$m,$d);
-    my $janone = greg2jd($y,1,1);
+    my ( $d, $m, $y ) = @_;
+    my $jd = greg2jd( $y, $m, $d );
+    my $janone = greg2jd( $y, 1, 1 );
     return $jd - $janone;
-} #}}}
+}    #}}}
+
+# sub hour {{{
 
 =head1 hour
 
@@ -864,8 +899,10 @@ Hour is in the range 0..23
 
 sub hour {
     my $self = shift;
-    return ($self->parsetime)[2];
-}
+    return ( $self->parsetime )[2];
+} # }}}
+
+# sub min {{{
 
 =head1 min
 
@@ -883,6 +920,10 @@ sub min {
 }
 
 sub minute { return min(@_); }
+
+# }}}
+
+# sub sec {{{
 
 =head1 sec
 
@@ -902,6 +943,8 @@ sub sec {
 
 sub second { return sec(@_); }
 
+# }}}
+
 =begin internal
 
  ( $sec, $min, $hour ) = parsetime( $seconds );
@@ -912,6 +955,8 @@ minutes, and hours of the current time.
 =end internal
 
 =cut
+
+# sub parsetime {{{
 
 sub parsetime {
     my $self = shift;
@@ -924,7 +969,7 @@ sub parsetime {
     $time -= $min * 60;
 
     return ( int($time), $min, $hour );
-}
+} # }}}
 
 # sub julian/jd #{{{
 
@@ -949,7 +994,7 @@ sub jd {
     my $self = shift;
 
     if ( my $jd = shift ) {
-        ($self->{julian}, $self->{julsec}) = @$jd;
+        ( $self->{julian}, $self->{julsec} ) = @$jd;
     }
 
     return [ $self->{julian}, $self->{julsec} ];
@@ -957,34 +1002,29 @@ sub jd {
 
 sub julian { return jd(@_) }
 
-
-
 # INTERNAL ONLY: figures out what the UTC offset (in HHMM) is
 # is for the current machine.
 sub _calc_local_offset {
 
     use Time::Local;
-	my @t = gmtime;
+    my @t = gmtime;
 
-    my $local =  timelocal(@t);
+    my $local = timelocal(@t);
     my $gm    = timegm(@t);
 
     my $secdiff = $gm - $local;
-    return _offset_from_seconds($secdiff); 
+    return _offset_from_seconds($secdiff);
 }
-
-
-
 
 #}}}
 
 1;
 
+# More docs {{{
+
 =head1 TODO
 
 =over 4 
-
-=item - add timezone support, including moving between timezones
 
 =item - add gmtime and localtime methods, perhaps?
 
@@ -1011,11 +1051,27 @@ Time::Local
 
 Net::ICal
 
+=cut
+
+#}}}
+
 # CVS History #{{{
 
 =head1 CVS History
 
   $Log: ICal.pm,v $
+  Revision 1.57  2001/12/11 15:12:29  rbowen
+  I've removed some warnings, because we are basically warning when people
+  use documented default behavior. This is very irritating. I also need to
+  update the documentation so that it is more clear on this point, but for
+  the moment, this scratches my immediate itch. --DrBacchus
+
+  Revision 1.56  2001/12/01 03:25:00  rbowen
+  This is, I believe, the intent of Yitzchak's first two patches. There is
+  no content in this diff, just style things. Ran perltidy on it to make
+  the whole file conform to agreed-upon style standards. And standardized
+  the usage of code folding characters.
+
   Revision 1.55  2001/11/28 02:00:16  rbowen
   Able to add n years to a date via the add method. Tests to match.
 
@@ -1176,5 +1232,4 @@ Net::ICal
 =cut
 
 #}}}
-
 

@@ -4,11 +4,10 @@ WriteMakefile(
   'NAME'         => 'Date::ICal',
   'VERSION_FROM' => 'ICal.pm',      # finds $VERSION
   'PREREQ_PM'    => {
-      Test::More => 0,
+      Test::More => '0.19', # skip()
 #     Test::Inline => 0,
       Date::Leapyear => '1.03',
       Time::Local    => 0,
-      Memoize        => 0,
       Time::HiRes    => 0,
       Storable       => 0,
   },    # e.g., Module::Name => 1.1
