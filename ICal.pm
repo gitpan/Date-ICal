@@ -2,17 +2,18 @@ package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths);
-$VERSION = (qw'$Revision: 1.49 $')[1];
+$VERSION = (qw'$Revision: 1.53 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
-use Memoize;
 use overload
    '<=>' => 'compare',
    'fallback' => 1;
 
 $localzone   = $ENV{TZ} || 0;
 $localoffset = _calc_local_offset();
+
+# Documentation {{{
 
 =head1 NAME
 
@@ -99,6 +100,8 @@ your local offset. If $TZ isn't set, new() will complain.
 
 =cut
 
+#}}}
+
 #{{{ sub new
 
 sub new {
@@ -180,8 +183,7 @@ sub new {
         $month++;
     }    #}}}
     
-    $self->{julian} = leapdays_before($year) + days_this_year( $day, $month, $year )
-						+ $year * 365 ;
+    $self->{julian} = greg2jd( $year, $month, $day );
     $self->{julsec} = time_as_seconds( $hour, $min, $sec );
     bless $self, $class; 
  
@@ -347,8 +349,7 @@ sub _offset_to_seconds {
 		# convert to seconds, ignoring the possibility of leap seconds
 		# or daylight-savings-time shifts
 		$newoffset = $hours*60*60 + $minutes*60;   
-		$newoffset = $sign . $newoffset;      # this is probably inefficient
-
+        $newoffset *= -1 if $sign eq '-';
 	}
 	else {
 		carp("You gave an offset, $offset, that makes no sense");
@@ -396,7 +397,6 @@ sub _offset_from_seconds {
 
 #}}}
 
-
 #{{{ sub offset
 
 =head2 offset 
@@ -438,7 +438,7 @@ sub offset {
 
     if ( defined($offset) ) {    # Passed in a new value
         $newoffset = _offset_to_seconds($offset);
-	
+
         unless (defined $newoffset) { return undef; }
 
         # since we're internally storing in GMT, we need to
@@ -450,6 +450,7 @@ sub offset {
             # the existing offset and the offset we were given.
             # If so, adjust appropriately.
             my $offsetdiff = $self->{offset} - $newoffset;
+
             if ($offsetdiff) {
                 $self->{offset} = $newoffset;
                 $self->add(seconds => $offsetdiff);  
@@ -474,8 +475,6 @@ sub offset {
 }
 
 #}}}
-
-=cut
 
 # sub add #{{{
 
@@ -552,6 +551,14 @@ sub add {
     $self->{julian} += $days;
 	$self->{julsec} += $seconds;
 
+    # Did we cross a day boundary?
+    if ($self->{julsec} < 0) {
+        $self->{julian}--;
+        $self->{julsec} += 86400;
+    } elsif ($self->{julsec} >= 86400) {
+        $self->{julian}++;
+        $self->{julsec} -= 86400;
+    }
     return $self;
 }
 #}}}
@@ -658,108 +665,6 @@ sub months {
 
 =begin internal
 
- $days = leapdays_before( 1984 );
-
-Returns the number of leap days occurring before the specified year.
-Starts counting in year 0 AD. Assumes (incorrectly, but sufficient for
-our purposes, if we are internally consistent) that all years since 0
-have obeyed standard leap year rules.
-
-Cheats on years between 1900 and 2099 by using a pre-calculated,
-hardcoded cheat array. This gives some speed increases.
-
-=end internal
-
-=cut
-
-=begin internal
-
-Routine to produce leapcheat array:
-
-	use Date::Leapyear;
-
-	my @cheat;
-	for(1900 .. 2099) {
-		push @cheat, leapdays_before($_);
-	}
-
-	my $string = 'my @leapcheat = (' . "\n";
-	for( $i = 0; $i += 10) {
-		$string .= "\t";
-		$string .= join ",", @cheat[$i .. $i + 9];
-		$string .= ",\n";
-	}
-	$string =~ s/[\s,]+$//;
-	$string .= "\n);";
-
-	print $string;
-
-Might be nice to make it a run-time option.
-
-=end internal
-
-=cut 
-
-{
-my @leapcheat = (
-	461,461,461,461,461,462,462,462,462,463,
-	463,463,463,464,464,464,464,465,465,465,
-	465,466,466,466,466,467,467,467,467,468,
-	468,468,468,469,469,469,469,470,470,470,
-	470,471,471,471,471,472,472,472,472,473,
-	473,473,473,474,474,474,474,475,475,475,
-	475,476,476,476,476,477,477,477,477,478,
-	478,478,478,479,479,479,479,480,480,480,
-	480,481,481,481,481,482,482,482,482,483,
-	483,483,483,484,484,484,484,485,485,485,
-	485,486,486,486,486,487,487,487,487,488,
-	488,488,488,489,489,489,489,490,490,490,
-	490,491,491,491,491,492,492,492,492,493,
-	493,493,493,494,494,494,494,495,495,495,
-	495,496,496,496,496,497,497,497,497,498,
-	498,498,498,499,499,499,499,500,500,500,
-	500,501,501,501,501,502,502,502,502,503,
-	503,503,503,504,504,504,504,505,505,505,
-	505,506,506,506,506,507,507,507,507,508,
-	508,508,508,509,509,509,509,510,510,510
-);
-
-sub leapdays_before {
-    my $year = shift;
-	return $leapcheat[$year - 1900] if defined $leapcheat[$year - 1900];
-
-    my $days = 0;
-
-    my $counter = 0;
-
-    while ( $counter < $year ) {
-        $days++ if Date::Leapyear::isleap($counter);
-        $counter += 4;
-    }
-
-    return $days;
-}
-
-}
-=begin internal
-
- days_this_year( $args{day}, $args{month}, $args{year} )
-
-Returns the number of days so far in the specified year.
-
-=end internal
-
-=cut
-
-sub days_this_year {
-    my ( $day, $month, $year ) = @_;
-
-    my @months = months($year);
-    return $months[ $month - 1 ] + $day - 1;
-}
-
-=begin internal
-
     time_as_seconds( $args{hour}, $args{min}, $args{sec} );
 
 Returns the time of day as the number of seconds in the day.
@@ -791,7 +696,7 @@ Day is in the range 1..31
 
 sub day {
     my $self = shift;
-    return ($self->parsedays)[0];
+    return (jd2greg( $self->{julian} ))[2];
 }
 
 =head2 month
@@ -806,7 +711,7 @@ Month is returned as a number in the range 1..12
 
 sub month {
     my $self = shift;
-    return ($self->parsedays)[1];
+    return (jd2greg( $self->{julian} ))[1];
 }
 
 sub mon { return month(@_); }
@@ -821,56 +726,104 @@ Returns the year.
 
 sub year {
     my $self = shift;
-    return ($self->parsedays)[2];
+    return (jd2greg( $self->{julian} ))[0];
 }
 
-=begin internal
+# sub jd2greg #{{{
 
- ( $day, $month, $year ) = parsedays ( $julian, $secs_since_midnight );
+=head2 jd2greg
 
-Given a modified modified julian day, returns the day, month, year for
-the given date.
+    ($year, $month, $day) = jd2greg( $jd );
 
-=end internal
+    Convert number of days on or after Jan 1, 1 CE (Gregorian) to
+    gregorian year,month,day.
 
 =cut
 
-sub parsedays {
-    my $self = shift;
-    my $day = $self->{julian};
-    return parsedays_memo( $day );
-}
+sub jd2greg {
+    use integer;
+    my $d = shift;
+    my $yadj = 0;
+    my ($c,$y,$m);
 
-memoize('parsedays_memo');
-sub parsedays_memo {
-    my $day = shift;
-
-    # What year are we in?
-    my $year = 0;
-    my $days = 0;
-    while ( $days < $day ) {
-        $days += ( 365 + 1 * ( Date::Leapyear::isleap($year) ) );
-        $year++;
-    }
-    $year-- unless $days == $day;
-
-    # What month is it?
-    $day -= ( $year * 365 + leapdays_before($year) );
-    my @months = months($year);
-
-    my $month = 0;
-    foreach my $m( 0 .. 12 ) {
-        if ( $months[$m] > $day ) {
-            $month = $m;
-            last;
-        }
+    # add 306 days to make relative to Mar 1, 0; also adjust $d to be within
+    # a range (1..2**28-1) where our calculations will work with 32bit ints
+    if ($d > 2**28-307) {
+	# avoid overflow if $d close to maxint
+	$yadj = ($d-146097+306)/146097+1;
+	$d -= $yadj*146097 - 306;
+    } elsif (($d+=306) <= 0) {
+	$yadj = -(-$d/146097+1); # avoid ambiguity in C division of negatives
+	$d -= $yadj*146097;
     }
 
-    $day -= $months[ $month - 1 ];
-    $day++;
+    $c = ($d*4-1)/146097;	# calc # of centuries $d is after 29 Feb of yr 0
+    $d -= $c*146097/4;		#     (4 centuries = 146097 days)
+    $y = ($d*4-1)/1461;		# calc number of years into the century,
+    $d -= $y*1461/4;		#     again March-based (4 yrs =~ 146[01] days)
+    $m = ($d*12+1093)/367;	# get the month (3..14 represent March through
+    $d -= ($m*367-1094)/12;     #     February of following year)
+    $y += $c*100+$yadj*400;	# get the real year, which is off by
+    ++$y, $m-=12 if $m > 12;	#     one if month is January or February
+    return ($y,$m,$d);
+} #}}}
 
-    return ( $day, $month, $year );
-}
+# sub greg2jd #{{{
+
+=head2 greg2jd
+
+    $jd = greg2jd( $year, $month, $day );
+
+    Convert gregorian year,month,day to days on or after Jan 1, 1 CE
+    (Gregorian).  Normalization is performed (e.g. month of 28 means
+    April two years after given year) for month < 1 or > 12 or day < 1
+    or > last day of month.
+
+=cut
+
+sub greg2jd {
+    use integer;
+    my ($y,$m,$d)=@_;
+    my $adj;
+
+    # make month in range 3..14 (treat Jan & Feb as months 13..14 of prev year)
+    if ($m <= 2) {
+	$y -= ($adj = (14-$m)/12);
+	$m += 12*$adj;
+    } elsif ($m > 14) {
+	$y += ($adj = ($m-3)/12);
+	$m -= 12*$adj;
+    }
+    # make year positive (oh, for a use integer 'sane_div'!)
+    if ($y < 0) {
+	$d -= 146097*($adj = (399-$y)/400);
+	$y += 400*$adj;
+    }
+
+    # add: day of month, days of previous 0-11 month period that began w/March,
+    # days of previous 0-399 year period that began w/March of a 400-multiple
+    # year), days of any 400-year periods before that, and 306 days to adjust
+    # from Mar 1, year 0-relative to Jan 1, year 1-relative (whew)
+
+    $d += ($m*367-1094)/12 + $y%100*1461/4 + ($y/100*36524+$y/400) - 306;
+} # }}}
+
+# sub days_this_year {{{
+
+=head2 days_this_year
+
+Returns the number of days so far this year. Analogous to the yday
+attribute of gmtime (or localtime) except that it works outside of the
+epoch.
+
+=cut
+
+sub days_this_year {
+    my ($y,$m,$d) = @_;
+    my $jd = greg2jd($y,$m,$d);
+    my $janone = greg2jd($y,1,1);
+    return $jd - $janone;
+} #}}}
 
 =head1 hour
 
@@ -936,11 +889,6 @@ minutes, and hours of the current time.
 sub parsetime {
     my $self = shift;
     my $time = $self->{julsec};
-    return parsetime_memo( $time );
-}
-
-sub parsetime_memo {
-    my $time = shift;
 
     my $hour = int( $time / 3600 );
     $time -= $hour * 3600;
@@ -1041,6 +989,25 @@ Net::ICal
 =head1 CVS History
 
   $Log: ICal.pm,v $
+  Revision 1.53  2001/11/24 16:25:10  rbowen
+  Since _seconds_from_offset returns a number, not a string, we only need
+  the sign if it is negative. Resolves some test failures that I was
+  seeing in t/08offset.t for negative offsets.
+
+  Revision 1.52  2001/11/24 03:42:39  rbowen
+  Resolves one of the test failures in offset/add - when add crossed a day
+  boundary by virtue of a difference in seconds, it was not compenting in
+  the day value, and could end up with negative times.
+
+  Revision 1.51  2001/11/24 03:11:25  rbowen
+  Added back in days_this_year method using new greg2jd method.
+
+  Revision 1.50  2001/11/24 02:54:22  rbowen
+  This is Yitzchak's patch to give us much more efficient gregorian <->
+  julian conversions, and to remove strange anomolous problems in the 17th
+  and 18 centuries. Note that we lose a few internal methods here, at
+  least one of which I'll be putting back in a minute.
+
   Revision 1.49  2001/11/22 10:56:23  srl
   This version incorporates a patch by Yitzchak Scott-Thoennes to
   adjust the offset() API. It no longer takes integer seconds
