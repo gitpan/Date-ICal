@@ -18,26 +18,26 @@ is ($t1->ical, '19691231T230000Z', 'offset set correctly with positive value');
 
 #-----------------------------------------------------------------------------
 # some internals tests
-is(Date::ICal::_offset_from_seconds(0), 0, 
-    "_offset_from_seconds does the right thing on 0");
-is(Date::ICal::_offset_from_seconds(3600), "+0100", 
-    "_offset_from_seconds works on positive whole hours");
-is(Date::ICal::_offset_from_seconds(-3600), "-0100", 
-    "_offset_from_seconds works on negative whole hours");
-is(Date::ICal::_offset_from_seconds(5400), "+0130", 
-    "_offset_from_seconds works on positive half hours");
-is(Date::ICal::_offset_from_seconds(-5400), "-0130", 
-    "_offset_from_seconds works on negative half hours");
+is(Date::ICal::offset_from_seconds(0), 0, 
+    "offset_from_seconds does the right thing on 0");
+is(Date::ICal::offset_from_seconds(3600), "+0100", 
+    "offset_from_seconds works on positive whole hours");
+is(Date::ICal::offset_from_seconds(-3600), "-0100", 
+    "offset_from_seconds works on negative whole hours");
+is(Date::ICal::offset_from_seconds(5400), "+0130", 
+    "offset_from_seconds works on positive half hours");
+is(Date::ICal::offset_from_seconds(-5400), "-0130", 
+    "offset_from_seconds works on negative half hours");
 
-is(Date::ICal::_offset_from_seconds(20700), "+0545", 
-    "_offset_from_seconds works on positive 15min zones");
-is(Date::ICal::_offset_from_seconds(-20700), "-0545", 
-    "_offset_from_seconds works on negative 15min zones");
+is(Date::ICal::offset_from_seconds(20700), "+0545", 
+    "offset_from_seconds works on positive 15min zones");
+is(Date::ICal::offset_from_seconds(-20700), "-0545", 
+    "offset_from_seconds works on negative 15min zones");
 
-is(Date::ICal::_offset_from_seconds(86400), "+0000", 
-    "_offset_from_seconds rolls over properly on one full day of seconds");
-is(Date::ICal::_offset_from_seconds(86400 + 3600), "+0100", 
-    "_offset_from_seconds rolls over properly on one day + 1 hour of seconds");
+is(Date::ICal::offset_from_seconds(86400), "+0000", 
+    "offset_from_seconds rolls over properly on one full day of seconds");
+is(Date::ICal::offset_from_seconds(86400 + 3600), "+0100", 
+    "offset_from_seconds rolls over properly on one day + 1 hour of seconds");
 
 # Need to write tests and code to handle bogus data gracefully. 
 # For example, what if someone tells us they have an offset

@@ -29,15 +29,15 @@ my $t = Date::ICal->new( ical => '19961122T183020Z' );
 # ok($t->month,10);
 
 $t->add( day => 1 );
-is($t->day, 23, 'Add one day');
+is( $t->day, 23, 'Add one day' );
 
 $t->add( week => 1 );
-is($t->day, 30, 'Add a week' );
+is( $t->day, 30, 'Add a week' );
 
 $t->add( hour => 3 );
-is($t->hour, 21, 'Add 3 hours' );
+is( $t->hour, 21, 'Add 3 hours' );
 
 $t->add( day => 15 );
 is( $t->month, 12, "2 weeks later, it is December" );
-is( $t->day, 15, "December 15th to be precise" );
+is( $t->day,   15, "December 15th to be precise" );
 

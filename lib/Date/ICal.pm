@@ -1,9 +1,9 @@
-# $Id: ICal.pm,v 1.70 2002/06/26 21:21:20 rbowen Exp $
+# $Id: ICal.pm,v 1.72 2003/01/18 20:09:42 rbowen Exp $
 package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths %add_units);
-$VERSION = (qw'$Revision: 1.70 $')[1];
+$VERSION = (qw'$Revision: 1.72 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -24,7 +24,7 @@ Date::ICal - Perl extension for ICalendar date objects.
 
 =head1 VERSION
 
-$Revision: 1.70 $
+$Revision: 1.72 $
 
 =head1 SYNOPSIS
 
@@ -272,7 +272,7 @@ sub ical {
         # No Z on the end!
         my $julian = $self->{julian};
         my $julsec = $self->{julsec};
-        my $adjust = _offset_to_seconds( $args{offset} );
+        my $adjust = offset_to_seconds( $args{offset} );
         $self->add( seconds => $adjust );
         $ical =
           sprintf( '%04d%02d%02dT%02d%02d%02d', $self->year, $self->month,
@@ -343,9 +343,9 @@ sub epoch {
 
 #}}}
 
-#{{{ sub _offset_to_seconds
+#{{{ sub offset_to_seconds
 
-=head2 _offset_to_seconds
+=head2 offset_to_seconds
 
     $seconds_plus_or_minus = offset_to_seconds($offset);
    
@@ -353,7 +353,7 @@ Changes -0600 to -21600. Not object method, no side-effects.
 
 =cut
 
-sub _offset_to_seconds {
+sub offset_to_seconds {
     my $offset = shift;
 
     # Relocated from offset for re-use
@@ -378,9 +378,9 @@ sub _offset_to_seconds {
 
 #}}}
 
-#{{{ sub _offset_from_seconds
+#{{{ sub offset_from_seconds
 
-=head2 _offset_from_seconds
+=head2 offset_from_seconds
 
     $seconds_plus_or_minus = offset_from_seconds($offset_in_seconds);
    
@@ -389,7 +389,7 @@ Not object method, no side-effects.
 
 =cut
 
-sub _offset_from_seconds {
+sub offset_from_seconds {
     my $secoffset  = shift;
     my $hhmmoffset = 0;
 
@@ -456,7 +456,7 @@ sub offset {
     my $newoffset = undef;
 
     if ( defined($offset) ) {    # Passed in a new value
-        $newoffset = _offset_to_seconds($offset);
+        $newoffset = offset_to_seconds($offset);
 
         unless ( defined $newoffset ) { return undef; }
 
@@ -485,7 +485,7 @@ sub offset {
 
       } else {
         if ( $self->{offset} ) {
-            $offset = _offset_from_seconds( $self->{offset} );
+            $offset = offset_from_seconds( $self->{offset} );
           } else {
             $offset = 0;
         }
@@ -1095,9 +1095,8 @@ epoch.
 
 sub days_this_year {
     my ( $d, $m, $y ) = @_;
-    my $jd = greg2jd( $y, $m, $d );
-    my $janone = greg2jd( $y, 1, 1 );
-    return $jd - $janone;
+    my @mlist = &months($y);
+    return $mlist[$m - 1] + $d - 1;
 }    #}}}
 
 # sub day_of_week {{{
@@ -1243,7 +1242,7 @@ sub _calc_local_offset {
     my $gm    = timegm(@t);
 
     my $secdiff = $gm - $local;
-    return _offset_from_seconds($secdiff);
+    return offset_from_seconds($secdiff);
 }
 
 #}}}

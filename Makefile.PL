@@ -12,10 +12,11 @@ The Reefknot Team
 
 WriteMakefile(
   'NAME'         => 'Date::ICal',
-  'VERSION_FROM' => 'lib/Date/ICal.pm',      # finds $VERSION
+  'VERSION_FROM' => 'lib/Date/ICal.pm',    # finds $VERSION
   'PREREQ_PM'    => {
-      Test::More => '0.19', # skip()
-#     Test::Inline => 0,
+      Test::Harness => '2.25',
+      Test::More    => '0.45',
+      #     Test::Inline => 0,
       Date::Leapyear => '1.03',
       Time::Local    => 0,
       Time::HiRes    => 0,

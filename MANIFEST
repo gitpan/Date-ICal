@@ -5,6 +5,7 @@ MANIFEST
 Makefile.PL
 README
 INTERNALS
+LICENSE
 Changes
 
 t/00load.t
