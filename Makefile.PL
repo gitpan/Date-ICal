@@ -23,6 +23,7 @@ WriteMakefile(
     'PREREQ_PM'		=> {
         Test::More => 0,
         Pod::Tests => 0,
+        Date::Leapyear => 0,
     }, # e.g., Module::Name => 1.1
 );
 
