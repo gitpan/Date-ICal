@@ -1,3 +1,10 @@
+2009-08-19 09:23  rbowen
+
+    * No functional changes in this revision, just a move to svn and a
+    cleanup of the documentation, removing references to long-defunct
+    URLs, and adding references to the datetime.perl.org project, where
+    you really should be looking for all of your Perl datetime needs.
+
 2003-01-18 15:11  rbowen
 
 	* MANIFEST (1.10): Added license to manifest

@@ -2,7 +2,7 @@ NAME
     Date::ICal - Perl extension for ICalendar date objects.
 
 VERSION
-    $Revision: 1.69 $
+    $Rev: 368 $
 
 SYNOPSIS
         use Date::ICal;
@@ -34,10 +34,8 @@ DESCRIPTION
     class for other date/calendar modules that know about ICal time format
     also.
 
-    See http://dates.rcbowen.com/unified.txt for details
-
 AUTHOR
-    Rich Bowen, and the Reefknot team (www.reefknot)
+    Rich Bowen
 
     Last touched by $Author: rbowen $
 
@@ -378,9 +376,7 @@ AUTHOR
 SEE ALSO
     datetime@perl.org mailing list
 
-    http://reefknot.org/
-
-    http://dates.rcbowen.com/
+    http://datetime.perl.org/
 
     Time::Local
 
@@ -391,7 +387,7 @@ NAME
     Date::ICal::Duration - durations in iCalendar format, for math purposes.
 
 VERSION
-    $Revision: 1.61 $
+    $Revision: 368 $
 
 SYNOPSIS
         use Date::ICal::Duration;
@@ -426,7 +422,7 @@ DESCRIPTION
     math in Date::ICal
 
 AUTHOR
-    Rich Bowen, and the Reefknot team (www.reefknot.org)
+    Rich Bowen, and the Reefknot team.
 
     Last touched by $Author: rbowen $
 

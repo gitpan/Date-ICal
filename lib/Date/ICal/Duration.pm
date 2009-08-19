@@ -1,4 +1,3 @@
-# $Header: /cvsroot/reefknot/Date-ICal/lib/Date/ICal/Duration.pm,v 1.61 2002/02/07 11:33:21 rbowen Exp $
 package Date::ICal::Duration;
 
 use strict;
@@ -53,7 +52,8 @@ in Date::ICal
 
 =head1 AUTHOR
 
-Rich Bowen, and the Reefknot team (www.reefknot.org)
+Rich Bowen, and the Reefknot team. Alas, Reefknot is no more. See
+http://datetime.perl.org/ for more modern modules.
 
 Last touched by $Author: rbowen $
 

@@ -1,13 +1,13 @@
 use ExtUtils::MakeMaker;
 
 print qq~
-Please note that the API for Date::ICal is still possibly in flux, and
-you should expect it to change without much warning. If you are actively
-using this module in important work, you need to subscribe to the
-development mailing list and keep track of what changes. See
-http://www.reefknot.org/ for relevant information.
+Please note that this module is long-since abandoned. While I do accept
+patches, and occasionally apply them, for the most part it is
+recommended that you move off of this module and use the various modules
+developed by the datetime project. You can find out more about the
+datetime project at http://datetime.perl.org/
 
-The Reefknot Team
+Rich Bowen - RBOW@CPAN.ORG
 ~;
 
 WriteMakefile(

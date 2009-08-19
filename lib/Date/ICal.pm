@@ -1,9 +1,9 @@
-# $Id: ICal.pm,v 1.72 2003/01/18 20:09:42 rbowen Exp $
+# $Rev: 366 $
 package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths %add_units);
-$VERSION = (qw'$Revision: 1.72 $')[1];
+$VERSION = '1.'.(qw'$Rev: 366 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -24,7 +24,7 @@ Date::ICal - Perl extension for ICalendar date objects.
 
 =head1 VERSION
 
-$Revision: 1.72 $
+$Revision: 366 $
 
 =head1 SYNOPSIS
 
@@ -57,11 +57,10 @@ Date::ICal::Duration (qv) object.
 Date::ICal talks the ICal date format, and is intended to be a base class for
 other date/calendar modules that know about ICal time format also.
 
-See http://dates.rcbowen.com/unified.txt for details
-
 =head1 AUTHOR
 
-Rich Bowen, and the Reefknot team (www.reefknot)
+Rich Bowen, and the Reefknot team. Alas, Reefknot is no more. See
+http://datetime.perl.org/ for more modern and accurate modules.
 
 Last touched by $Author: rbowen $
 
@@ -1276,9 +1275,7 @@ list of patch contributors and version-by-version notes.
 
 datetime@perl.org mailing list
 
-http://reefknot.org/
-
-http://dates.rcbowen.com/
+http://datetime.perl.org/
 
 Time::Local
 

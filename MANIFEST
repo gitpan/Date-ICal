@@ -20,3 +20,4 @@ t/08offset.t
 t/09greg.t
 t/10subtract.t
 t/11duration.t
+META.yml                                 Module meta-data (added by MakeMaker)
