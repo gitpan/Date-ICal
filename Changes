@@ -1,3 +1,9 @@
+2011-05-10
+
+    * Applies patch from Mark Alway for situation where min, hour, and
+    sec are all '00'. However, a reminder that you should be using the
+    DateTime modules instead.
+
 2009-08-19 09:23  rbowen
 
     * No functional changes in this revision, just a move to svn and a

@@ -1,9 +1,9 @@
-# $Rev: 366 $
+# $Rev: 647 $
 package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths %add_units);
-$VERSION = '1.'.(qw'$Rev: 366 $')[1];
+$VERSION = '2.'.(qw'$Rev: 647 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -24,7 +24,7 @@ Date::ICal - Perl extension for ICalendar date objects.
 
 =head1 VERSION
 
-$Revision: 366 $
+$Revision: 647 $
 
 =head1 SYNOPSIS
 
@@ -283,7 +283,7 @@ sub ical {
         # make output in UTC by default
         # if we were originally given this time in offset
         # form, we'll need to adjust it for output
-        if ( $self->hour || $self->min || $self->sec ) {
+        if ( $self->hour =~ /^\d\d$/ || $self->min =~ /^\d\d$/ || $self->sec =~ /^\d\d$/ ) {
             $ical =
               sprintf( '%04d%02d%02dT%02d%02d%02dZ', $self->year, $self->month,
               $self->day, $self->hour, $self->minute, $self->second );
