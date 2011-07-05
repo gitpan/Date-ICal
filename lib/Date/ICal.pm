@@ -1,9 +1,9 @@
-# $Rev: 649 $
+# $Rev: 678 $
 package Date::ICal;
 use strict;
 
 use vars qw($VERSION $localzone $localoffset @months @leapmonths %add_units);
-$VERSION = '2.'.(qw'$Rev: 649 $')[1];
+$VERSION = '2.'.(qw'$Rev: 678 $')[1];
 use Carp;
 use Time::Local;
 use Date::Leapyear qw();
@@ -24,7 +24,7 @@ Date::ICal - Perl extension for ICalendar date objects.
 
 =head1 VERSION
 
-$Revision: 649 $
+$Revision: 678 $
 
 =head1 SYNOPSIS
 
@@ -49,8 +49,8 @@ Date::ICal::Duration (qv) object.
 
     $ical += 'P6DT12H';
 
-    $duration = $ical1 - $ical2;
-    $ical3 = $ical1 - $duration;
+    $duration = $ical - $ical2;
+    $ical3 = $ical - $duration;
 
 =head1 DESCRIPTION
 
@@ -815,9 +815,9 @@ sub subtract {
     # we should subtract and get a date
         return $date1 - $dur; # Is that cheating?
 
-    # Otherwise, we should call them nasty names and return undef
+    # Otherwise, return undef
     } else {
-        warn "Moron";
+        warn "Invalid arguments. You can subtract a date from a date, or a duration from a date";
         return;
     }
 
